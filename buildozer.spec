@@ -35,3 +35,9 @@ log_level = 2
 
 # (int) Tampilkan peringatan jika versi buildozer sudah usang
 warn_on_root = 1
+
+# 禁用自动下载 Android SDK
+android.skip_update = True
+# 为构建工具指定路径
+android.sdk_path = ~/android-sdk
+android.ndk_path = ~/android-sdk/ndk/21.1.6352462
