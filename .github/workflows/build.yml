@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Android APK (with manual SSH)
 
 on:
   push:
@@ -48,21 +48,16 @@ jobs:
       run: |
         pip install --upgrade pip
         pip install buildozer cython virtualenv
-        
-    - name: Build APK
-      run: |
-        # 清除之前的构建缓存
-        buildozer android clean
-        
-        # 设置环境变量避免符号问题
-        export LDFLAGS="-Wl,--no-as-needed"
-        export LIBS="-ltinfo"
-        
-        # 使用更稳定的 NDK 版本
-        buildozer -v android release \
-          -- --ndk_version=21d \
-          --sdk_version=24
-        
+
+    # 新增步骤：通过 SSH 连接进行手动编译和调试
+    - name: SSH into the runner for manual build
+      uses: mxschmitt/action-tmate@v3
+      timeout-minutes: 30 # 设置 SSH 会话的超时时间，例如 30 分钟
+      with:
+        limit-access-to-actor: true # 限制只有触发此工作流程的用户才能访问 SSH
+
+    # 当你手动构建完成后，并且 APK 文件位于正确的路径下，
+    # 在关闭 SSH 连接后，下面的步骤将继续执行。
     - name: Upload APK artifact
       uses: actions/upload-artifact@v4
       with:
