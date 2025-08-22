@@ -19,17 +19,16 @@ jobs:
         with:
           python-version: '3.9'
 
-      # 步骤 3: 安装基本的系统依赖和 Buildozer
-      # 我们预先安装好这些，让你进入后可以直接开始编译
+      # 步骤 3: 安装正确的系统依赖和 Buildozer
+      # 已将过时的 libtinfo5 和 ncurses 包替换为现代版本
       - name: Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y git zip unzip openjdk-17-jdk python3-pip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev
+          sudo apt-get install -y git zip unzip openjdk-17-jdk python3-pip autoconf libtool pkg-config zlib1g-dev libncurses-dev cmake libffi-dev libssl-dev
           pip install --upgrade pip
           pip install "cython==0.29.34" buildozer
 
       # 步骤 4: 暂停工作流并建立 SSH 连接
       # 这一步会运行 tmate，并输出 SSH 连接信息到日志中
-      # 工作流会在此暂停，直到 SSH 连接超时 (约15分钟) 或你手动断开
       - name: Setup tmate session
         uses: mxschmitt/action-tmate@v3
