@@ -1,45 +1,34 @@
 [app]
 
-# Application title
+# 应用名称和包名
 title = 轮换表计录入系统
+package.name = meterreplacement
+package.domain = org.yanzhou
 
-# Package name (reverse domain format)
-package.name = com.yanshougongdiansuo.meterentry
-
-# Application version
-version = 1.0.0
-
-# Source code directory
+# 源文件配置
 source.dir = .
-
-# Application icon
-#icon.filename = icon.png
-
-# Presplash screen
-#presplash.filename = presplash.png
-
-# Supported orientations (portrait|landscape)
-orientation = portrait
-
-# Main application file
-source.main = main.py
-
-# Included files and patterns
-source.include_exts = py,png,jpg,kv,atlas,ttf,xlsx
+source.include_exts = py,png,jpg,kv,ttf,xlsx
 source.include_patterns = assets/*,fonts/*
 
-# Android specific configurations
-android.arch = armeabi-v7a
-
-# Accept SDK licenses automatically
-android.accept_sdk_license = True
-
-# Android permissions
-android.permissions = WRITE_EXTERNAL_STORAGE, READ_EXTERNAL_STORAGE
-
-# Application requirements
-requirements = python3==3.10.5, kivy==2.3.0, plyer, pandas, openpyxl, chardet
-
-# Build behavior
-log_level = 2
+# 主程序入口
+orientation = portrait
 fullscreen = 0
+requirements = 
+    python3,
+    kivy==2.2.1,
+    pandas,
+    openpyxl,
+    xlrd,
+    plyer,
+    pyjnius
+
+# Android 特定配置
+android.permissions = WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE
+android.api = 33
+android.minapi = 21
+android.ndk = 23b
+android.sdk_path = 
+p4a.branch = master
+
+# 资源包含
+assets.dir = assets
