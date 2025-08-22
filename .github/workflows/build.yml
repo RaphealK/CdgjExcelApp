@@ -43,22 +43,7 @@ jobs:
 
     - name: Build APK
       run: |
-        # 接受所有 SDK 许可协议
-        mkdir -p "$HOME/.android"
-        touch "$HOME/.android/repositories.cfg"
         yes | buildozer android debug
-        
-        # 备用方案：如果上述方法失败，使用 expect 自动应答
-        # sudo apt-get install -y expect
-        # expect -c '
-        #   set timeout 180
-        #   spawn buildozer android debug
-        #   expect {
-        #     "Do you accept the license*" { send "y\r"; exp_continue }
-        #     eof
-        #   }
-        # '
-
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
