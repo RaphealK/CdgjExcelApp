@@ -18,6 +18,10 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: "3.10"
+          
+      - name: Accept Android SDK licenses
+        run: |
+          yes | sdkmanager --licenses || true
 
       # 缓存 Buildozer 依赖和 Android SDK/NDK
       - name: Cache .buildozer
