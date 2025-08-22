@@ -1,48 +1,35 @@
-# =======================================================================================
-#
-# GitHub Workflow for building Android APK with Buildozer
-#
-# Corrected version to resolve "repository not found" error.
-# This workflow uses the official Kivy action to handle all dependencies,
-# including Java, Android SDK/NDK, and license acceptance.
-#
-# =======================================================================================
+name: Debug Build Environment via SSH
 
-name: Build Android APK with Buildozer
-
-# Triggers the workflow on push events to the main branch
 on:
-  push:
-    branches:
-      - main
+  # 允许你从 GitHub 仓库的 "Actions" 标签页手动触发此工作流
+  workflow_dispatch:
 
 jobs:
-  build-android:
-    # Use the latest version of Ubuntu as the runner
+  debug-build:
     runs-on: ubuntu-latest
-
+    
     steps:
-      # Step 1: Check out your repository code
+      # 步骤 1: 检出你的代码，这样你的项目文件就会存在于环境中
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Step 2: Build the APK using the official Kivy Buildozer Action
-      # This action encapsulates all the complex setup steps.
-      - name: Build with Buildozer
-        uses: kivy/buildozer-action@v1
+      # 步骤 2: 安装 Python 环境
+      - name: Set up Python
+        uses: actions/setup-python@v4
         with:
-          # The command that the action will execute
-          command: buildozer -v android debug
-          
-          # (Optional) You can specify the path to your spec file if it's not in the root
-          # spec_file: buildozer.spec
+          python-version: '3.9'
 
-      # Step 3: Upload the generated APK as a workflow artifact
-      # This makes the APK available for download from the Actions summary page.
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          # The name of the artifact in the summary
-          name: app-debug-apk
-          # The path to the file(s) to upload. The wildcard '*' captures the generated APK.
-          path: bin/*.apk
+      # 步骤 3: 安装基本的系统依赖和 Buildozer
+      # 我们预先安装好这些，让你进入后可以直接开始编译
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git zip unzip openjdk-17-jdk python3-pip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev
+          pip install --upgrade pip
+          pip install "cython==0.29.34" buildozer
+
+      # 步骤 4: 暂停工作流并建立 SSH 连接
+      # 这一步会运行 tmate，并输出 SSH 连接信息到日志中
+      # 工作流会在此暂停，直到 SSH 连接超时 (约15分钟) 或你手动断开
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v4
