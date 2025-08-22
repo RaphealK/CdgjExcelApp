@@ -1,4 +1,4 @@
-name: Build Android APK (with manual SSH)
+name: Build Android APK with Docker
 
 on:
   push:
@@ -7,76 +7,65 @@ on:
     branches: [ main ]
 
 jobs:
-  build:
+  build-apk:
     runs-on: ubuntu-latest
-    
+    container:
+      image: crazymax/ndk:r21d  # 包含 NDK 21d 的稳定 Docker 镜像
+      options: --privileged  # 需要特权模式以访问设备
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
-      
-    - name: Set up Python 3.10
-      uses: actions/setup-python@v3
-      with:
-        python-version: "3.10"
-        
-    - name: Install system dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y git zip unzip openjdk-11-jdk autoconf automake libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev cmake libffi-dev libssl-dev
-        # 修复 libtinfo5 问题
-        wget http://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/libtinfo5_6.3-2ubuntu0.1_amd64.deb
-        sudo apt install ./libtinfo5_6.3-2ubuntu0.1_amd64.deb
-        pip install --upgrade pip
-        pip install buildozer cython virtualenv
-        
-        # 安装完整版本的 autoconf 和 libtool
-        wget http://ftp.gnu.org/gnu/autoconf/autoconf-2.69.tar.gz
-        tar xvf autoconf-2.69.tar.gz
-        cd autoconf-2.69
-        ./configure && make && sudo make install
-        cd ..
-        rm -rf autoconf-2.69*
-        
-        wget http://ftp.gnu.org/gnu/libtool/libtool-2.4.6.tar.gz
-        tar xvf libtool-2.4.6.tar.gz
-        cd libtool-2.4.6
-        ./configure && make && sudo make install
-        cd ..
-        rm -rf libtool-2.4.6*
 
-        # ============ 新增的关键步骤 ============
-    - name: Set up Android SDK and accept licenses
+    - name: Set up build environment
       run: |
-        sudo apt-get install -y wget unzip
+        # 安装必要的依赖
+        apt-get update
+        apt-get install -y python3-pip python3-dev python3-setuptools \
+                          git zip unzip \
+                          libncurses5 libncursesw5 libtinfo5 \
+                          zlib1g-dev libssl-dev libffi-dev \
+                          autoconf automake libtool pkg-config
         
-        # 下载并安装 Android Command Line Tools
-        wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
-        unzip commandlinetools-linux-9477386_latest.zip
-        mkdir -p ~/android-sdk/cmdline-tools
-        mv cmdline-tools ~/android-sdk/cmdline-tools/latest
+        # 安装 Buildozer
+        pip3 install --upgrade pip
+        pip3 install buildozer cython virtualenv
         
-        # 设置环境变量
-        echo "ANDROID_HOME=~/android-sdk" >> $GITHUB_ENV
-        echo "PATH=$PATH:~/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_ENV
+        # 设置 Android SDK 路径
+        echo "export ANDROID_SDK_ROOT=/sdk" >> ~/.bashrc
+        echo "export ANDROID_NDK_ROOT=/opt/android-ndk" >> ~/.bashrc
+        source ~/.bashrc
         
-        # 接受所有许可协议
-        yes | ~/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses
-        ~/android-sdk/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-33" "build-tools;34.0.0"
-    # ======================================
-    
-    - name: Install Python dependencies
-      run: |
-        pip install --upgrade pip
-        pip install buildozer cython virtualenv
+        # 创建并接受 Android SDK 许可
+        mkdir -p /root/.android
+        touch /root/.android/repositories.cfg
+        echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > /root/.android/licenses/android-sdk-license
+        echo "d56f5187479451eabf01fb78af6dfcb131a6481e" > /root/.android/licenses/android-sdk-arm-dbt-license
 
     - name: Build APK
       run: |
+        # 设置环境变量自动接受许可
+        export ANDROID_LICENSES_ACCEPT=yes
+        
+        # 初始化 Buildozer
+        buildozer init -v
+        
+        # 修改 buildozer.spec 文件 (如果需要)
+        sed -i "s|android.accept_sdk_license = False|android.accept_sdk_license = True|g" buildozer.spec
+        sed -i "s|#android.ndk_path = |android.ndk_path = /opt/android-ndk|g" buildozer.spec
+        sed -i "s|#android.sdk_path = |android.sdk_path = /sdk|g" buildozer.spec
+        
+        # 执行构建
         buildozer -v android release
+        
+        # 重命名 APK 文件
+        cd bin
+        for apk in *.apk; do
+          mv "$apk" "meter-entry-${GITHUB_SHA:0:7}.apk"
+        done
 
-    # 当你手动构建完成后，并且 APK 文件位于正确的路径下，
-    # 在关闭 SSH 连接后，下面的步骤将继续执行。
     - name: Upload APK artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v3
       with:
-        name: meter-entry-app
+        name: meter-entry-apk
         path: bin/*.apk
