@@ -1,34 +1,78 @@
-name: Debug Build Environment via SSH
+name: Build Android APK
 
 on:
-  # 允许你从 GitHub 仓库的 "Actions" 标签页手动触发此工作流
-  workflow_dispatch:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
-  debug-build:
+  build:
     runs-on: ubuntu-latest
     
     steps:
-      # 步骤 1: 检出你的代码，这样你的项目文件就会存在于环境中
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      # 步骤 2: 安装 Python 环境
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.9'
-
-      # 步骤 3: 安装正确的系统依赖和 Buildozer
-      # 已将过时的 libtinfo5 和 ncurses 包替换为现代版本
-      - name: Install Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y git zip unzip openjdk-17-jdk autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev autoconf automake libtool  
-          pip install --upgrade pip
-          pip install "cython==0.29.34" buildozer
-
-      # 步骤 4: 暂停工作流并建立 SSH 连接
-      # 这一步会运行 tmate，并输出 SSH 连接信息到日志中
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
+    - name: Checkout code
+      uses: actions/checkout@v3
+      
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v3
+      with:
+        python-version: "3.10"
+        
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y git zip unzip openjdk-11-jdk autoconf automake libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev cmake libffi-dev libssl-dev
+        # 修复 libtinfo5 问题
+        wget http://archive.ubuntu.com/ubuntu/pool/main/n/ncurses/libtinfo5_6.2-0ubuntu1_amd64.deb
+        sudo dpkg -i libtinfo5_6.2-0ubuntu1_amd64.deb
+        rm libtinfo5_6.2-0ubuntu1_amd64.deb
+        
+        # 安装完整版本的 autoconf 和 libtool
+        wget http://ftp.gnu.org/gnu/autoconf/autoconf-2.69.tar.gz
+        tar xvf autoconf-2.69.tar.gz
+        cd autoconf-2.69
+        ./configure && make && sudo make install
+        cd ..
+        rm -rf autoconf-2.69*
+        
+        wget http://ftp.gnu.org/gnu/libtool/libtool-2.4.6.tar.gz
+        tar xvf libtool-2.4.6.tar.gz
+        cd libtool-2.4.6
+        ./configure && make && sudo make install
+        cd ..
+        rm -rf libtool-2.4.6*
+        
+    - name: Install Python dependencies
+      run: |
+        pip install --upgrade pip
+        pip install buildozer cython virtualenv
+        
+    - name: Configure Buildozer
+      run: |
+        mkdir -p ~/.buildozer/android/platform
+        cd ~/.buildozer/android/platform
+        wget https://github.com/kivy/python-for-android/releases/download/2023.10.06/python-for-android-2023.10.06.tar.gz
+        tar xvf python-for-android-2023.10.06.tar.gz
+        mv python-for-android-2023.10.06 python-for-android
+        rm python-for-android-2023.10.06.tar.gz
+        
+    - name: Build APK
+      run: |
+        # 清除之前的构建缓存
+        buildozer android clean
+        
+        # 设置环境变量避免符号问题
+        export LDFLAGS="-Wl,--no-as-needed"
+        export LIBS="-ltinfo"
+        
+        # 使用更稳定的 NDK 版本
+        buildozer -v android release \
+          -- --ndk_version=21d \
+          --sdk_version=24
+        
+    - name: Upload APK artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: meter-entry-app
+        path: bin/*.apk
