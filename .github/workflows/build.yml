@@ -32,4 +32,4 @@ jobs:
       # 这一步会运行 tmate，并输出 SSH 连接信息到日志中
       # 工作流会在此暂停，直到 SSH 连接超时 (约15分钟) 或你手动断开
       - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v4
+        uses: mxschmitt/action-tmate@v3
