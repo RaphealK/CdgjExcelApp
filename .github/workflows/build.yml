@@ -1,10 +1,10 @@
 name: Build APK
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:   # 手动触发
   push:
     branches:
-      - main
+      - main          # 推送到 main 分支时触发
 
 jobs:
   build:
@@ -36,11 +36,6 @@ jobs:
                               git zip unzip openjdk-17-jdk \
                               libltdl-dev libffi-dev libssl-dev
           pip install --upgrade pip cython wheel buildozer
-
-      - name: Pre-install Android SDK packages
-        run: |
-          yes | sdkmanager --licenses || true
-          sdkmanager "platforms;android-33" "build-tools;33.0.2"
 
       - name: Build APK
         run: |
