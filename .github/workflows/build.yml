@@ -22,6 +22,7 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y git zip unzip openjdk-11-jdk autoconf automake libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev cmake libffi-dev libssl-dev
+        
         # 修复 libtinfo5 问题
         wget http://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/libtinfo5_6.3-2ubuntu0.1_amd64.deb
         sudo apt install ./libtinfo5_6.3-2ubuntu0.1_amd64.deb
@@ -41,9 +42,27 @@ jobs:
         cd ..
         rm -rf libtool-2.4.6*
 
-    - name: Build APK
+    - name: Install expect for automated inputs
+      run: sudo apt-get install -y expect
+
+    - name: Build APK with automated inputs
       run: |
-        yes | buildozer android debug
+        # 创建必要的 Android 目录结构
+        mkdir -p "$HOME/.android"
+        touch "$HOME/.android/repositories.cfg"
+        
+        # 使用 expect 自动应答许可协议
+        expect -c '
+          set timeout 180
+          spawn buildozer android debug
+          expect {
+            "Do you accept the license*" { 
+              send "y\r"
+              exp_continue 
+            }
+            eof
+          }
+        '
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
