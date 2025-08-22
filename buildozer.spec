@@ -29,10 +29,6 @@ source.include_exts = py,png,jpg,kv,atlas,ttf,xlsx
 source.include_patterns = assets/*,fonts/*
 
 # Android specific configurations
-android.minapi = 21
-android.target_api = 24
-android.ndk_path = /opt/android-ndk  # Docker 容器中的路径
-android.sdk_path = /sdk             # Docker 容器中的路径
 android.arch = armeabi-v7a
 
 # Accept SDK licenses automatically
@@ -47,6 +43,3 @@ requirements = python3==3.10.5, kivy==2.3.0, plyer, pandas, openpyxl, chardet
 # Build behavior
 log_level = 2
 fullscreen = 0
-android.wakelock = False
-android.allow_backup = True
-android.private_storage = False
