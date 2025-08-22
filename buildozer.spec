@@ -1,43 +1,52 @@
 [app]
-# (string) Judul aplikasi Anda
-title = Sistem Entri Data Excel
 
-# (string) Nama paket aplikasi
-package.name = exceldatainput
+# Application title
+title = 轮换表计录入系统
 
-# (string) Domain paket aplikasi
-package.domain = org.example
+# Package name (reverse domain format)
+package.name = com.yanshougongdiansuo.meterentry
 
-# (string) Direktori sumber yang berisi main.py
+# Application version
+version = 1.0.0
+
+# Source code directory
 source.dir = .
 
-# (list) Ekstensi file sumber yang akan disertakan (jangan kosongkan untuk menyertakan semua file)
-source.include_exts = py,png,jpg,kv,atlas,xlsx,ttc
+# Application icon
+#icon.filename = icon.png
 
-# (string) Versi aplikasi Anda
-version = 0.1
+# Presplash screen
+#presplash.filename = presplash.png
 
-# (list) Daftar dependensi Python yang akan diinstal dari PyPI
-requirements = python3,kivy,pandas,openpyxl,plyer
-
-# (string) Orientasi layar yang diinginkan
+# Supported orientations (portrait|landscape)
 orientation = portrait
 
-# (string) Arsitektur target
-android.arch = arm64-v8a
+# Main application file
+source.main = main.py
 
-# (list) Izin yang dibutuhkan aplikasi Anda
-android.permissions = ReadExternalStorage,WriteExternalStorage
+# Included files and patterns
+source.include_exts = py,png,jpg,kv,atlas,ttf,xlsx
+source.include_patterns = assets/*,fonts/*
 
-[buildozer]
-# (int) Tingkat verbositas output buildozer
+# Android specific configurations
+android.minapi = 21
+android.target_api = 24
+android.ndk_path = /opt/android-ndk  # Docker 容器中的路径
+android.sdk_path = /sdk             # Docker 容器中的路径
+android.arch = armeabi-v7a
+
+# Accept SDK licenses automatically
+android.accept_sdk_license = True
+
+# Android permissions
+android.permissions = WRITE_EXTERNAL_STORAGE, READ_EXTERNAL_STORAGE
+
+# Application requirements
+requirements = python3==3.10.5, kivy==2.3.0, plyer, pandas, openpyxl, chardet
+
+# Build behavior
 log_level = 2
-
-# (int) Tampilkan peringatan jika versi buildozer sudah usang
-warn_on_root = 1
-
-# 禁用自动下载 Android SDK
-android.skip_update = True
-# 为构建工具指定路径
-android.sdk_path = ~/android-sdk
-android.ndk_path = ~/android-sdk/ndk/21.1.6352462
+fullscreen = 0
+android.wakelock = False
+android.allow_backup = True
+android.private_storage = False
