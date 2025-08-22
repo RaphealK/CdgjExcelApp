@@ -1,14 +1,14 @@
 name: Build APK
 
 on:
-  workflow_dispatch:   # 手动触发
+  workflow_dispatch:
   push:
     branches:
-      - main          # 推送到 main 分支时触发
+      - main
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-20.04
 
     steps:
       - name: Checkout code
@@ -19,7 +19,6 @@ jobs:
         with:
           python-version: "3.10"
 
-      # 缓存 Buildozer 依赖和 Android SDK/NDK
       - name: Cache .buildozer
         uses: actions/cache@v4
         with:
@@ -38,15 +37,13 @@ jobs:
                               libltdl-dev libffi-dev libssl-dev
           pip install --upgrade pip cython wheel buildozer
 
-      - name: Force accept Android licenses
+      - name: Pre-install Android SDK packages
         run: |
           yes | sdkmanager --licenses || true
+          sdkmanager "platforms;android-33" "build-tools;33.0.2"
 
       - name: Build APK
         run: |
-          # 确保 buildozer.spec 里有以下设置:
-          # android.api = 33
-          # android.build_tools_version = 33.0.2
           buildozer android debug
 
       - name: Upload APK artifact
