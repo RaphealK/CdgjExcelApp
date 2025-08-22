@@ -40,7 +40,7 @@ orientation = portrait
 
 # (可选) 应用图标的文件路径。
 # 请确保在项目根目录下有一个名为 "icon.png" 的 1024x1024 像素的图片文件。
-icon.filename = %(source.dir)s/icon.png
+# icon.filename = %(source.dir)s/icon.png
 
 # (可选) 应用启动画面的图片路径。
 # splash.filename = %(source.dir)s/data/splash.png
