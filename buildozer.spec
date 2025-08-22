@@ -30,6 +30,8 @@ android.add_presplash = true
 
 # 使用哪种打包方式
 fullscreen = 0
+android.api = 33
+android.build_tools_version = 33.0.2
 
 [buildozer]
 log_level = 2
