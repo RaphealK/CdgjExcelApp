@@ -27,6 +27,8 @@ jobs:
         wget http://archive.ubuntu.com/ubuntu/pool/main/n/ncurses/libtinfo5_6.2-0ubuntu1_amd64.deb
         sudo dpkg -i libtinfo5_6.2-0ubuntu1_amd64.deb
         rm libtinfo5_6.2-0ubuntu1_amd64.deb
+        pip install --upgrade pip
+        pip install buildozer cython virtualenv
         
         # 安装完整版本的 autoconf 和 libtool
         wget http://ftp.gnu.org/gnu/autoconf/autoconf-2.69.tar.gz
