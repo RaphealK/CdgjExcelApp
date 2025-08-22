@@ -7,35 +7,28 @@ on:
 
 jobs:
   build-android:
-    runs-on: ubuntu-latest  # 使用最新的 Ubuntu 系统作为构建环境
+    runs-on: ubuntu-latest # 使用最新的 Ubuntu 系统作为构建环境
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4 # 步骤1: 拉取你的代码
+        uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v4 # 步骤2: 设置 Python 环境
+      - name: Build with Buildozer
+        # 使用官方推荐的 Kivy Buildozer Action
+        uses: kivy/buildozer-action@v1
         with:
-          python-version: '3.9' # 使用 Python 3.9
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          # 安装 buildozer 和它依赖的 cython
-          # 固定 Cython 版本以提高构建稳定性
-          pip install buildozer "cython==0.29.34"
+          # 要执行的 buildozer 命令
+          command: buildozer -v android debug
           
-          # (可选) 安装其他系统级依赖
-          # sudo apt-get update
-          # sudo apt-get install -y ...
-
-      - name: Run Buildozer
-        run: |
-          # 运行 buildozer 命令来构建 debug 版本的 APK
-          buildozer -v android debug
+          # (可选) 指定 buildozer.spec 文件的位置
+          # spec_file: buildozer.spec
+          
+          # (可选) 设置构建缓存，可以极大加快后续的构建速度
+          # cache_name: buildozer-cache
 
       - name: Upload APK artifact
-        uses: actions/upload-artifact@v4 # 步骤3: 上传构建好的 APK 文件
+        # 上传构建产物 (APK)
+        uses: actions/upload-artifact@v4
         with:
           name: app-debug-apk # 上传产物的名称
           path: bin/*.apk # 指定 APK 文件所在的路径
