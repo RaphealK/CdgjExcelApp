@@ -46,11 +46,7 @@ jobs:
       run: sudo apt-get install -y expect
 
     - name: Build APK with automated inputs
-      run: |
-        # 创建必要的 Android 目录结构
-        mkdir -p "$HOME/.android"
-        touch "$HOME/.android/repositories.cfg"
-        
+      run: |        
         # 使用 expect 自动应答许可协议
         expect -c '
           set timeout 180
