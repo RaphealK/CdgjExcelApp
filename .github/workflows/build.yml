@@ -49,16 +49,40 @@ jobs:
       run: |        
         # 使用 expect 自动应答许可协议
         expect -c '
-          set timeout 180
-          spawn buildozer android debug
-          expect {
-            "Do you accept the license*" { 
-              send "y\r"
-              exp_continue 
-            }
-            eof
-          }
-        '
+  # 超时：每轮等待最多 300 秒
+  set timeout 300
+
+  # 启动构建
+  spawn buildozer android debug
+
+  # 循环处理各种可能的许可提示
+  expect {
+    -re {(?i)do you accept.*license} {
+      send "y\r"
+      exp_continue
+    }
+    -re {(?i)accept\?\s*\[?y\/?n\]?\:?} {
+      send "y\r"
+      exp_continue
+    }
+    -re {(?i)\(y\/N\)|\[y\/N\]} {
+      send "y\r"
+      exp_continue
+    }
+    timeout {
+      send_user "\n[expect] 等待输出超时（> $timeout 秒），构建可能挂起。\n"
+      exit 1
+    }
+    eof {
+      # 读取被 spawn 进程的退出状态并向外传播
+      catch wait result
+      # result: {pid 1234 spawn_id 5 status 0 matched} 或 {.... CHILDKILLED .... code 2}
+      set code [lindex $result 3]
+      if {$code eq ""} { set code 0 }
+      exit $code
+    }
+  }
+'
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
