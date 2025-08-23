@@ -39,7 +39,7 @@ orientation = portrait
 fullscreen = 0
 
 # (list) Permissions
-android.permissions = READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE
+android.permissions = INTERNET, READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE
 
 # (int) Android API to use
 # As of 2024, Google Play requires a target API level of 33 or higher.
