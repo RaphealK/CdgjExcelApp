@@ -29,15 +29,22 @@ jobs:
         wget http://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/libtinfo5_6.3-2ubuntu0.1_amd64.deb
         sudo apt install ./libtinfo5_6.3-2ubuntu0.1_amd64.deb
 
-    # 缓存 Android SDK
-    - name: Cache Android SDK
-      uses: actions/cache@v4
-      with:
-        path: ~/android-sdk
-        key: android-sdk-${{ runner.os }}-v1
+        # 安装最新 autoconf & libtool（避免版本过低）
+        wget http://ftp.gnu.org/gnu/autoconf/autoconf-2.69.tar.gz
+        tar xvf autoconf-2.69.tar.gz
+        cd autoconf-2.69
+        ./configure && make -j$(nproc) && sudo make install
+        cd ..
+        rm -rf autoconf-2.69*
+
+        wget http://ftp.gnu.org/gnu/libtool/libtool-2.4.6.tar.gz
+        tar xvf libtool-2.4.6.tar.gz
+        cd libtool-2.4.6
+        ./configure && make -j$(nproc) && sudo make install
+        cd ..
+        rm -rf libtool-2.4.6*
 
     - name: Install Android SDK command-line tools
-      if: steps.cache-android-sdk.outputs.cache-hit != 'true'
       run: |
         ANDROID_SDK_ROOT=$HOME/android-sdk
         mkdir -p $ANDROID_SDK_ROOT/cmdline-tools
@@ -50,23 +57,15 @@ jobs:
         echo "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin" >> $GITHUB_PATH
         echo "$ANDROID_SDK_ROOT/platform-tools" >> $GITHUB_PATH
 
-    - name: Configure Android SDK
+    - name: Accept Android SDK licenses
       run: |
-        export ANDROID_SDK_ROOT=$HOME/android-sdk
         yes | sdkmanager --licenses || true
         sdkmanager "platform-tools" "platforms;android-30" "build-tools;30.0.3"
 
-    - name: Install Python dependencies
+    - name: Install Buildozer
       run: |
         pip install --upgrade pip
         pip install buildozer cython virtualenv
-
-    # 缓存 Buildozer 的 .buildozer 目录（Gradle / SDK / NDK 缓存）
-    - name: Cache Buildozer .buildozer
-      uses: actions/cache@v4
-      with:
-        path: .buildozer
-        key: buildozer-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}
 
     - name: Build APK
       run: |
