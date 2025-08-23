@@ -1,4 +1,4 @@
-name: Android Build
+name: Android Build with Cache
 
 on:
   push:
@@ -9,9 +9,25 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      BUILDOZER_HOME: ${{ github.workspace }}/.buildozer_cache  # 集中管理缓存位置
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+
+    # 设置缓存路径
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      id: deps-cache
+      with:
+        path: |
+          ${{ github.workspace }}/.buildozer_cache
+          ~/.cache/pip
+          ~/.gradle/caches
+          ~/.android
+        key: ${{ runner.os }}-deps-${{ hashFiles('buildozer.spec') }}-${{ secrets.CACHE_VERSION }}
+        restore-keys: |
+          ${{ runner.os }}-deps-
 
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -25,18 +41,31 @@ jobs:
           autoconf automake libtool libltdl-dev pkg-config zlib1g-dev \
           libncurses5-dev libncursesw5-dev cmake libffi-dev libssl-dev gettext patchelf \
           build-essential ccache liblzma-dev patch python3-pip python3-setuptools sudo autopoint
-          
+
         # 修复 libtinfo5 问题
-        wget http://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/libtinfo5_6.3-2ubuntu0.1_amd64.deb
-        sudo apt install ./libtinfo5_6.3-2ubuntu0.1_amd64.deb
+        wget -q http://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/libtinfo5_6.3-2ubuntu0.1_amd64.deb
+        sudo apt install -y ./libtinfo5_6.3-2ubuntu0.1_amd64.deb
+        rm libtinfo5_6.3-2ubuntu0.1_amd64.deb
 
     - name: Install Python dependencies
       run: |
         pip install --upgrade pip
         pip install buildozer cython 
+        pip cache purge  # 清理不必要的缓存
 
-    - name: Build APK (auto accept licenses)
+    - name: Build APK (optimized with cache)
       run: |
+        # 设置缓存环境变量
+        export ANDROID_SDK_HOME="$BUILDOZER_HOME/android"
+        export ANDROID_NDK_HOME="$BUILDOZER_HOME/android/ndk"
+        export GRADLE_USER_HOME="$BUILDOZER_HOME/gradle"
+        
+        # 初始化构建环境（仅当缓存未命中时）
+        if [ ! -d "$BUILDOZER_HOME" ]; then
+          mkdir -p $BUILDOZER_HOME
+          buildozer init
+        fi
+
         buildozer appclean
         script -q -c "yes | buildozer android debug" /dev/null
 
