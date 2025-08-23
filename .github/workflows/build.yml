@@ -32,11 +32,8 @@ jobs:
     - name: Install Python dependencies
       run: |
         pip install --upgrade pip
-        pip install buildozer cython virtualenv
+        pip install buildozer cython 
 
-      export AUTOCONF="autoconf -I /usr/share/aclocal"
-      export AUTOMAKE="automake"
-      export ACLOCAL="aclocal -I /usr/share/aclocal"
     - name: Build APK (auto accept licenses)
       run: |
         script -q -c "yes | buildozer android debug" /dev/null
