@@ -23,7 +23,8 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y git zip unzip openjdk-11-jdk wget curl \
           autoconf automake libtool libltdl-dev pkg-config zlib1g-dev \
-          libncurses5-dev libncursesw5-dev cmake libffi-dev libssl-dev gettext patchelf
+          libncurses5-dev libncursesw5-dev cmake libffi-dev libssl-dev gettext patchelf \
+          build-essential ccache liblzma-dev patch python3-pip python3-setuptools sudo 
 
         # 修复 libtinfo5 问题
         wget http://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/libtinfo5_6.3-2ubuntu0.1_amd64.deb
