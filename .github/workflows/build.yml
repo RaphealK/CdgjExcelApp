@@ -29,21 +29,6 @@ jobs:
         wget http://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/libtinfo5_6.3-2ubuntu0.1_amd64.deb
         sudo apt install ./libtinfo5_6.3-2ubuntu0.1_amd64.deb
 
-        # 安装新版 autoconf & libtool
-        wget http://ftp.gnu.org/gnu/autoconf/autoconf-2.69.tar.gz
-        tar xvf autoconf-2.69.tar.gz
-        cd autoconf-2.69
-        ./configure && make -j$(nproc) && sudo make install
-        cd ..
-        rm -rf autoconf-2.69*
-
-        wget http://ftp.gnu.org/gnu/libtool/libtool-2.4.6.tar.gz
-        tar xvf libtool-2.4.6.tar.gz
-        cd libtool-2.4.6
-        ./configure && make -j$(nproc) && sudo make install
-        cd ..
-        rm -rf libtool-2.4.6*
-
     - name: Install Python dependencies
       run: |
         pip install --upgrade pip
