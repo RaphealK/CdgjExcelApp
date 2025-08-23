@@ -32,3 +32,4 @@ p4a.branch = master
 
 # 资源包含
 assets.dir = assets
+version = 0.1
