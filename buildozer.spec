@@ -20,8 +20,7 @@ requirements =
     openpyxl,
     xlrd,
     plyer,
-    pyjnius,
-		libffi==3.4.4
+    pyjnius
 
 # Android 特定配置
 android.permissions = WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE
