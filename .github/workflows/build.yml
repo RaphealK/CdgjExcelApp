@@ -1,4 +1,6 @@
-name: Android Build
+# .github/workflows/build.yml
+
+name: Android Build with Cache
 
 on:
   push:
@@ -9,40 +11,65 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
+    # 1. Checkout your repository code
     - name: Checkout
       uses: actions/checkout@v4
-      
-    - name: Install system dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y git zip unzip openjdk-17-jdk wget curl \
-          autoconf automake libtool libltdl-dev pkg-config zlib1g-dev \
-          libncurses5-dev libncursesw5-dev cmake libffi-dev libssl-dev gettext patchelf \
-          build-essential ccache liblzma-dev patch python3-pip python3-setuptools sudo autopoint
-          
-        # 修复 libtinfo5 问题
-        wget http://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/libtinfo5_6.3-2ubuntu0.1_amd64.deb
-        sudo apt install ./libtinfo5_6.3-2ubuntu0.1_amd64.deb
-        
+
+    # 2. Set up JDK 17, which is required for modern Android builds
+    - name: Set up Java Development Kit
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+
+    # 3. Set up Python and cache pip dependencies
+    # The 'cache: pip' option automatically handles caching and restoring pip packages.
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: "3.8"
+        cache: 'pip'
 
+    # 4. Install essential system dependencies for the build process
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y git zip unzip wget curl \
+          autoconf automake libtool libltdl-dev pkg-config zlib1g-dev \
+          libncurses5-dev libncursesw5-dev cmake libffi-dev libssl-dev gettext patchelf \
+          build-essential ccache liblzma-dev patch python3-setuptools sudo autopoint
+        
+        # Fix for libtinfo5, which is required by some Android SDK tools
+        wget http://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/libtinfo5_6.3-2ubuntu0.1_amd64.deb
+        sudo apt install ./libtinfo5_6.3-2ubuntu0.1_amd64.deb
 
-
+    # 5. Install the required Python packages
     - name: Install Python dependencies
       run: |
         pip install --upgrade pip
         pip install buildozer
         pip install cython==0.29.33
 
+    # 6. Cache the global Buildozer directory (~/.buildozer)
+    # This stores downloaded Android SDK, NDK, and other large platform tools.
+    # The cache is invalidated only when your buildozer.spec file changes.
+    - name: Cache Buildozer global directory
+      uses: actions/cache@v4
+      with:
+        path: ~/.buildozer
+        key: ${{ runner.os }}-buildozer-global-${{ hashFiles('buildozer.spec') }}
+        restore-keys: |
+          ${{ runner.os }}-buildozer-global-
+
+    # 7. Build the APK
+    # The 'script' command helps automatically answer 'yes' to license agreements.
     - name: Build APK (auto accept licenses)
       run: |
-        buildozer appclean
         script -q -c "yes | buildozer android debug" /dev/null
 
+    # 8. Upload the generated APK as a build artifact
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
