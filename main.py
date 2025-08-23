@@ -392,4 +392,101 @@ class MainScreen(Screen):
             form_layout.add_widget(inp)
           
         form_layout.add_widget(Label(text='表计类型'))
-        self.inputs['meter_type'] = Spinner(text='单相表', values=('单相表', '三相表'), size_hint_y=
+        self.inputs['meter_type'] = Spinner(text='单相表', values=('单相表', '三相表'), size_hint_y=None, height=44)
+        form_layout.add_widget(self.inputs['meter_type'])
+      
+        form_layout.add_widget(Label(text='表箱类型'))
+        self.inputs['box_type'] = Spinner(
+            text='利旧未换', 
+            values=('利旧未换', '单位', '双位', '双位单装'),
+            size_hint_y=None, 
+            height=44
+        )
+        form_layout.add_widget(self.inputs['box_type'])
+
+        self.layout.add_widget(form_layout)
+      
+        btn_layout = BoxLayout(size_hint_y=0.1, spacing=10)
+        submit_btn = Button(text='提交保存')
+        submit_btn.bind(on_press=self.save_data)
+        btn_layout.add_widget(submit_btn)
+      
+        back_btn = Button(text='返回上一步')
+        back_btn.bind(on_press=lambda x: self.show_verification_screen(self.user_info))
+        btn_layout.add_widget(back_btn)
+        self.layout.add_widget(btn_layout)
+
+    def get_output_path(self):
+        """获取平台兼容的输出路径"""
+        if platform == 'android':
+            from jnius import autoclass
+            Environment = autoclass('android.os.Environment')
+            # 保存到公共的Downloads目录
+            output_dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).getAbsolutePath()
+        else:
+            # 桌面平台保存在当前工作目录
+            output_dir = os.getcwd()
+
+        if self.output_path is None or not os.path.dirname(self.output_path) == output_dir:
+            now_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+            self.output_path = os.path.join(output_dir, f'录入结果_{now_str}.xlsx')
+        
+        return self.output_path
+
+    def save_data(self, instance):
+        data = {
+            '客户号': self.user_info.get('客户号', ''), '用户名': self.user_info.get('用户名', ''),
+            '原表资产号': self.user_info.get('原表资产号', ''), '原表表码': self.inputs['old_meter'].text,
+            '新资产号': self.inputs['new_asset'].text, '铅封号': self.inputs['seal_number'].text,
+            '表计类型': self.inputs['meter_type'].text, '表箱类型': self.inputs['box_type'].text,
+            '安装人员': INSTALLER_NAMES,
+            '材料使用': self.inputs['material_usage'].text, '备注': self.inputs['remark'].text,
+            '录入时间': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        
+        self.save_to_excel(data)
+
+    def save_to_excel(self, data):
+        output_file = self.get_output_path()
+        try:
+            new_row = pd.DataFrame([data])
+            df = pd.read_excel(output_file) if os.path.exists(output_file) else pd.DataFrame()
+            df = pd.concat([df, new_row], ignore_index=True)
+          
+            column_order = [
+                '客户号', '用户名', '原表资产号', '原表表码', '新资产号',
+                '表计类型', '铅封号', '表箱类型', '材料使用', '安装人员',
+                '备注', '录入时间'
+            ]
+            df.reindex(columns=column_order).to_excel(output_file, index=False)
+
+            self.current_count += 1
+            self.show_popup("成功", f"数据已保存！\n路径:\n{output_file}")
+            self.create_input_ui()
+            self.stats_label.text = f'本轮已录入: {self.current_count}条'
+
+        except PermissionError:
+            self.show_popup("保存错误", f"无法写入文件！\n请检查权限或关闭已打开的Excel文件:\n{output_file}")
+        except Exception as e:
+            self.show_popup("保存错误", f"保存数据时出错: {str(e)}")
+
+    def export_data(self, instance):
+        if self.output_path and os.path.exists(self.output_path):
+            self.show_popup("导出成功", f"数据已保存到:\n{self.output_path}")
+        else:
+            self.show_popup("警告", "尚未录入任何数据，无文件可导出")
+
+    def show_popup(self, title, message):
+        show_popup_global(title, message)
+
+
+class ExcelDataEntryApp(App):
+    def build(self):
+        self.screen_manager = ScreenManager()
+        self.screen_manager.add_widget(StartupScreen(name='start'))
+        self.screen_manager.add_widget(MainScreen(name='main'))
+        return self.screen_manager
+
+
+if __name__ == '__main__':
+    ExcelDataEntryApp().run()
