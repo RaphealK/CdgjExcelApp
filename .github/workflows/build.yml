@@ -1,6 +1,6 @@
 # .github/workflows/build.yml
 
-name: Android Build with Cache
+name: Android Build
 
 on:
   push:
@@ -13,26 +13,24 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # 1. Checkout your repository code
+    # 1. 检出您的存储库代码
     - name: Checkout
       uses: actions/checkout@v4
 
-    # 2. Set up JDK 17, which is required for modern Android builds
+    # 2. 设置 JDK 17，这是现代 Android 构建所必需的
     - name: Set up Java Development Kit
       uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
         java-version: '17'
 
-    # 3. Set up Python and cache pip dependencies
-    # The 'cache: pip' option automatically handles caching by looking for a requirements file.
+    # 3. 设置 Python
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: "3.8"
-        cache: 'pip'
 
-    # 4. Install essential system dependencies for the build process
+    # 4. 安装构建过程所需的基本系统依赖项
     - name: Install system dependencies
       run: |
         sudo apt-get update
@@ -41,35 +39,23 @@ jobs:
           libncurses5-dev libncursesw5-dev cmake libffi-dev libssl-dev gettext patchelf \
           build-essential ccache liblzma-dev patch python3-setuptools sudo autopoint
         
-        # Fix for libtinfo5, which is required by some Android SDK tools
+        # 修复某些 Android SDK 工具所需的 libtinfo5
         wget http://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/libtinfo5_6.3-2ubuntu0.1_amd64.deb
         sudo apt install ./libtinfo5_6.3-2ubuntu0.1_amd64.deb
 
-    # 5. Install Python dependencies from requirements.txt
-    # This allows the caching step to work correctly. You must create this file.
+    # 5. 从 requirements.txt 安装 Python 依赖项
     - name: Install Python dependencies
       run: |
         pip install --upgrade pip
         pip install -r requirements.txt
 
-    # 6. Cache the global Buildozer directory (~/.buildozer)
-    # This stores downloaded Android SDK, NDK, and other large platform tools.
-    # The cache is invalidated only when your buildozer.spec file changes.
-    - name: Cache Buildozer global directory
-      uses: actions/cache@v4
-      with:
-        path: ~/.buildozer
-        key: ${{ runner.os }}-buildozer-global-${{ hashFiles('buildozer.spec') }}
-        restore-keys: |
-          ${{ runner.os }}-buildozer-global-
-
-    # 7. Build the APK
-    # The 'script' command helps automatically answer 'yes' to license agreements.
+    # 6. 构建 APK
+    # 'script' 命令有助于自动回答许可证协议的 'yes'
     - name: Build APK (auto accept licenses)
       run: |
         script -q -c "yes | buildozer android debug" /dev/null
 
-    # 8. Upload the generated APK as a build artifact
+    # 7. 将生成的 APK 作为构建产物上传
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
