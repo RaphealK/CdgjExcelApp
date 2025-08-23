@@ -127,42 +127,42 @@ class StartupScreen(Screen):
         filechooser.open_file(on_selection=self.handle_selection, title="请选择台账Excel文件", filters=[("Excel Files", "*.xlsx", "*.xls")])
 
     def handle_selection(self, selection):
-    if not selection:
-        return
-    selected_path = selection[0]
-
-    if platform == 'android':
-        try:
-            from jnius import autoclass, cast
-            PythonActivity = autoclass('org.kivy.android.PythonActivity')
-            context = PythonActivity.mActivity.getApplicationContext()
-
-            cache_dir = context.getCacheDir().getAbsolutePath()
-            file_name = os.path.basename(selected_path)
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            local_path = os.path.join(cache_dir, f"{timestamp}_{file_name}")
-
-            cr = context.getContentResolver()
-            uri = autoclass('android.net.Uri').parse(selected_path)
-            input_stream = cr.openInputStream(uri)
-
-            with open(local_path, 'wb') as f_out:
-                byte_array = autoclass('java.io.ByteArrayOutputStream')()
-                buffer = autoclass('java.nio.ByteBuffer').allocate(4096)
-
-                while True:
-                    data = input_stream.read()
-                    if data == -1:  # 结束
-                        break
-                    f_out.write(bytes([data]))
-
-            input_stream.close()
-            self.excel_path_input.text = local_path
-        except Exception as e:
-            self.show_popup("文件处理错误", f"无法复制文件: {e}\n原始路径: {selected_path}")
-    else:
-        self.excel_path_input.text = selected_path
-
+        if not selection:
+            return
+        selected_path = selection[0]
+    
+        if platform == 'android':
+            try:
+                from jnius import autoclass, cast
+                PythonActivity = autoclass('org.kivy.android.PythonActivity')
+                context = PythonActivity.mActivity.getApplicationContext()
+    
+                cache_dir = context.getCacheDir().getAbsolutePath()
+                file_name = os.path.basename(selected_path)
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                local_path = os.path.join(cache_dir, f"{timestamp}_{file_name}")
+    
+                cr = context.getContentResolver()
+                uri = autoclass('android.net.Uri').parse(selected_path)
+                input_stream = cr.openInputStream(uri)
+    
+                with open(local_path, 'wb') as f_out:
+                    byte_array = autoclass('java.io.ByteArrayOutputStream')()
+                    buffer = autoclass('java.nio.ByteBuffer').allocate(4096)
+    
+                    while True:
+                        data = input_stream.read()
+                        if data == -1:  # 结束
+                            break
+                        f_out.write(bytes([data]))
+    
+                input_stream.close()
+                self.excel_path_input.text = local_path
+            except Exception as e:
+                self.show_popup("文件处理错误", f"无法复制文件: {e}\n原始路径: {selected_path}")
+        else:
+            self.excel_path_input.text = selected_path
+    
     def start_app(self, instance):
         excel_path = self.excel_path_input.text.strip()
         if not os.path.exists(excel_path):
@@ -185,8 +185,6 @@ class StartupScreen(Screen):
 
 
 class MainScreen(Screen):
-    # ... MainScreen的代码大部分保持不变 ...
-    # 只需要确保它的 show_popup 方法也使用全局的那个
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.layout = BoxLayout(orientation='vertical', padding=10, spacing=10)
@@ -411,4 +409,3 @@ class ExcelDataEntryApp(App):
 
 if __name__ == '__main__':
     ExcelDataEntryApp().run()
-
