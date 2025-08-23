@@ -24,11 +24,11 @@ requirements =
 
 # Android 特定配置
 android.permissions = WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE
-android.api = 33
-android.minapi = 21
-android.ndk = 23b
-android.sdk_path = 
-p4a.branch = master
+#android.api = 33
+#android.minapi = 21
+#android.ndk = 23b
+#android.sdk_path = 
+#p4a.branch = master
 
 # 资源包含
 assets.dir = assets
