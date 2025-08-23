@@ -21,7 +21,7 @@ requirements =
     xlrd,
     plyer,
     pyjnius,
-		libffi==3.3
+		libffi==3.4.4
 
 # Android 特定配置
 android.permissions = WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE
