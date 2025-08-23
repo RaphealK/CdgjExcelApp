@@ -51,6 +51,8 @@ android.minapi = 21
 # (list) Android architectures to build for
 android.archs = arm64-v8a, armeabi-v7a
 
+android.enable_androidx = True
+
 
 [buildozer]
 
