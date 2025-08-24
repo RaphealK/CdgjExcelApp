@@ -24,7 +24,7 @@ version = 1.0
 
 # (list) Application requirements
 # Kivy for the app, pandas for excel, plyer for filechooser, openpyxl for pandas to read/write xlsx
-requirements = python3,kivy,pandas,plyer,openpyxl,cython,pyjnius,jnius,et_xmlfile
+requirements = python3,kivy,pandas,plyer,openpyxl,cython,pyjnius,jnius,et_xmlfile,kivymd
 
 # (str) Custom orientation
 orientation = portrait
