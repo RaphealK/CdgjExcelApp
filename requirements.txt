@@ -1,2 +1,3 @@
 buildozer
 cython==0.29.33
+openpyxl
