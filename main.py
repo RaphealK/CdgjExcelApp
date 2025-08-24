@@ -73,7 +73,10 @@ def show_popup_global(title, message):
 class AssetDatabase:
     def __init__(self, excel_path):
         try:
-            self.df = pd.read_excel(excel_path, header=2)
+            # ==================== MODIFICATION HERE ====================
+            # Explicitly use the 'openpyxl' engine for .xlsx files
+            self.df = pd.read_excel(excel_path, header=2, engine='openpyxl')
+            # =========================================================
         except FileNotFoundError:
             self.df = pd.DataFrame()
             raise
@@ -104,7 +107,6 @@ class StartupScreen(Screen):
         self.main_layout = BoxLayout(orientation='vertical', padding=20, spacing=10)
         self.main_layout.add_widget(Label(text="轮换表计录入系统", font_size=24))
         
-        # 文件路径选择布局
         path_layout = BoxLayout(size_hint_y=0.1)
         self.excel_path_input = TextInput(
             hint_text="点击右侧按钮选择Excel文件",
@@ -118,16 +120,13 @@ class StartupScreen(Screen):
         path_layout.add_widget(browse_btn)
         self.main_layout.add_widget(path_layout)
         
-        # 启动按钮
         btn = Button(text="启动系统", size_hint_y=0.1)
         btn.bind(on_press=self.start_app)
         self.main_layout.add_widget(btn)
         
-        # 日志区域布局
         log_layout = BoxLayout(orientation='vertical', size_hint_y=0.4, spacing=5)
         log_layout.add_widget(Label(text="文件操作日志:", size_hint_y=0.1))
         
-        # 日志显示区域（可滚动）
         log_scroll = ScrollView()
         self.log_textinput = TextInput(
             text=self.log_text, 
@@ -138,10 +137,8 @@ class StartupScreen(Screen):
         )
         log_scroll.add_widget(self.log_textinput)
         log_layout.add_widget(log_scroll)
-        
         self.main_layout.add_widget(log_layout)
         
-        # 底部信息
         footer_layout = BoxLayout(orientation='vertical', size_hint_y=0.1)
         footer_layout.add_widget(Label(
             text="延寿供电所-K-2025年制", font_size='12sp',
@@ -151,34 +148,24 @@ class StartupScreen(Screen):
         
         self.add_widget(self.main_layout)
         
-        # 添加初始日志
         self.add_log("系统初始化完成")
         self.add_log(f"默认文件路径: {self.excel_path_input.text}")
     
     def add_log(self, message):
-        """添加日志条目并更新UI"""
         timestamp = datetime.now().strftime("%H:%M:%S")
         log_entry = f"[{timestamp}] {message}\n"
         self.log_text += log_entry
         self.log_textinput.text = self.log_text
-        # 自动滚动到底部
         self.log_textinput.cursor = (0, len(self.log_textinput.text))
     
     def android_init(self):
-        """安卓初始化"""
-        # 绑定活动结果处理
         activity.bind(on_activity_result=self.on_activity_result)
-        
-        # 首次启动时请求权限
         self.request_android_permissions()
     
     def request_android_permissions(self):
-        """请求必要的安卓权限"""
         try:
             if platform != 'android':
                 return
-                
-            # 检查是否已经有权限
             if (not check_permission(Permission.READ_EXTERNAL_STORAGE) or 
                 not check_permission(Permission.WRITE_EXTERNAL_STORAGE)):
                 permissions = [Permission.READ_EXTERNAL_STORAGE, Permission.WRITE_EXTERNAL_STORAGE]
@@ -189,12 +176,10 @@ class StartupScreen(Screen):
             Clock.schedule_once(lambda dt: self.show_popup("权限错误", f"无法请求安卓权限: {e}"))
 
     def browse_file(self, instance):
-        """打开文件选择器"""
         self.add_log("启动文件选择器...")
         if platform == 'android':
             self.open_android_file_chooser()
         else:
-            # 桌面平台使用plyer
             try:
                 from plyer import filechooser
                 self.add_log("打开桌面文件选择器")
@@ -208,7 +193,6 @@ class StartupScreen(Screen):
                 self.show_popup("功能缺失", "文件选择功能需要安装'plyer'库。\n请运行: pip install plyer")
     
     def handle_selection(self, selection):
-        """处理桌面文件选择结果"""
         if selection:
             path = selection[0]
             self.excel_path_input.text = path
@@ -217,14 +201,12 @@ class StartupScreen(Screen):
             self.add_log("文件选择已取消")
 
     def open_android_file_chooser(self):
-        """安卓原生文件选择器"""
         try:
             intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
             intent.addCategory(Intent.CATEGORY_OPENABLE)
-            intent.setType("*/*")  # 所有文件类型
+            intent.setType("*/*")
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             intent.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
-            
             current_activity = cast('android.app.Activity', PythonActivity.mActivity)
             current_activity.startActivityForResult(intent, self.ACTIVITY_RESULT_FILE_PICKER)
             self.add_log("已启动安卓文件选择器")
@@ -233,30 +215,20 @@ class StartupScreen(Screen):
             self.show_popup("文件选择错误", f"无法打开文件选择器: {e}")
 
     def on_activity_result(self, request_code, result_code, intent):
-        """
-        处理安卓文件选择结果的回调。
-        这个方法由Android系统在非Kivy主线程上调用，
-        因此我们必须使用Clock.schedule_once将所有处理逻辑调度到主线程执行。
-        """
         Clock.schedule_once(
             lambda dt: self._process_activity_result(request_code, result_code, intent)
         )
 
     def _process_activity_result(self, request_code, result_code, intent):
-        """在Kivy主线程上安全地处理文件选择结果"""
-        if request_code != self.ACTIVITY_RESULT_FILE_PICKER or result_code != -1:  # -1 = RESULT_OK
+        if request_code != self.ACTIVITY_RESULT_FILE_PICKER or result_code != -1:
             self.add_log("文件选择已取消")
             return
-            
         try:
             uri = intent.getData()
             if not uri:
                 self.add_log("错误: 未获取到文件URI")
                 return
-                
             self.add_log(f"获取到文件URI: {uri.toString()}")
-                
-            # 获取持久化权限
             context = PythonActivity.mActivity.getApplicationContext()
             content_resolver = context.getContentResolver()
             content_resolver.takePersistableUriPermission(
@@ -264,32 +236,23 @@ class StartupScreen(Screen):
                 Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
             )
             self.add_log("已获取文件持久化权限")
-            
-            # 复制文件到缓存
             self.add_log("开始复制文件...")
-            # 因为我们已经确保在主线程上，所以可以直接调用
             self.copy_and_process_uri(uri)
-            
         except Exception as e:
             error_msg = f"文件处理错误: {e}\n{traceback.format_exc()}"
             self.add_log(error_msg)
             self.show_popup("文件处理错误", f"处理文件URI时出错: {error_msg}")
 
     def copy_and_process_uri(self, uri):
-        """复制URI指向的文件到应用缓存"""
         try:
             context = PythonActivity.mActivity.getApplicationContext()
             content_resolver = context.getContentResolver()
-            
-            # 获取缓存目录
             cache_dir = context.getCacheDir().getAbsolutePath()
             self.add_log(f"应用缓存目录: {cache_dir}")
             
-            # 从URI获取文件名
             cursor = content_resolver.query(uri, None, None, None, None)
             file_name = ""
             if cursor:
-                # 在Android 10及以上版本，此列名为 _display_name
                 name_index = cursor.getColumnIndex('_display_name')
                 cursor.moveToFirst()
                 file_name = cursor.getString(name_index)
@@ -299,16 +262,13 @@ class StartupScreen(Screen):
                 file_name = f"台账_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
                 self.add_log(f"无法获取文件名，使用默认: {file_name}")
             
-            # 目标文件路径
             local_path = os.path.join(cache_dir, file_name)
             self.add_log(f"目标路径: {local_path}")
             
-            # 复制文件
             input_stream = content_resolver.openInputStream(uri)
             output_stream = BufferedOutputStream(FileOutputStream(local_path))
             
-            # 使用缓冲区高效复制
-            buffer = bytearray(1024 * 1024)  # 1MB缓冲区
+            buffer = bytearray(1024 * 1024)
             total_bytes = 0
             self.add_log("开始复制文件内容...")
             while True:
@@ -322,7 +282,6 @@ class StartupScreen(Screen):
             output_stream.close()
             self.add_log(f"文件复制完成，大小: {total_bytes//1024} KB")
             
-            # 更新UI
             self.excel_path_input.text = local_path
             self.add_log(f"文件已复制到: {local_path}")
             
@@ -347,13 +306,11 @@ class StartupScreen(Screen):
             timestamp = datetime.now().strftime("%H:%M:%S")
             app.asset_db = AssetDatabase(excel_path)
             
-            # 记录加载成功的信息
             row_count = len(app.asset_db.df)
             self.add_log(f"文件加载成功! 时间: {timestamp}")
             self.add_log(f"记录总数: {row_count}")
             self.add_log(f"首条记录资产号: {app.asset_db.df.iloc[0]['原表资产号']}")
             
-            # 切换到主界面
             main_screen = self.manager.get_screen('main')
             main_screen.reset_session()
             self.add_log("正在进入主界面...")
@@ -363,7 +320,7 @@ class StartupScreen(Screen):
             self.add_log(error_msg)
             self.show_popup("Excel读取错误", error_msg)
         except Exception as e:
-            error_msg = f"加载Excel时发生未知错误: {str(e)}"
+            error_msg = f"加载Excel时发生未知错误: {str(e)}\n{traceback.format_exc()}"
             self.add_log(error_msg)
             self.show_popup("启动错误", error_msg)
 
@@ -380,7 +337,6 @@ class MainScreen(Screen):
         self.add_widget(self.layout)
 
     def reset_session(self):
-        """Resets the counter and output path when starting a new session."""
         self.current_count = 0
         self.output_path = None
         self.create_input_ui() 
@@ -522,14 +478,11 @@ class MainScreen(Screen):
         self.layout.add_widget(btn_layout)
 
     def get_output_path(self):
-        """获取平台兼容的输出路径"""
         if platform == 'android':
             from jnius import autoclass
             Environment = autoclass('android.os.Environment')
-            # 保存到公共的Downloads目录
             output_dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).getAbsolutePath()
         else:
-            # 桌面平台保存在当前工作目录
             output_dir = os.getcwd()
 
         if self.output_path is None or not os.path.dirname(self.output_path) == output_dir:
@@ -555,7 +508,7 @@ class MainScreen(Screen):
         output_file = self.get_output_path()
         try:
             new_row = pd.DataFrame([data])
-            df = pd.read_excel(output_file) if os.path.exists(output_file) else pd.DataFrame()
+            df = pd.read_excel(output_file, engine='openpyxl') if os.path.exists(output_file) else pd.DataFrame()
             df = pd.concat([df, new_row], ignore_index=True)
           
             column_order = [
