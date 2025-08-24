@@ -1,63 +1,81 @@
-# .github/workflows/build.yml
+name: Manual APK Release
 
-name: Android Build
-
+# 1. 改为手动触发
+# on: [push] #原来的触发器
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '发布版本号 (例如: 1.0.0)'
+        required: true
+        default: '1.0.0'
 
 jobs:
-  build:
+  build-and-release:
     runs-on: ubuntu-latest
-
     steps:
-    # 1. 检出您的存储库代码
-    - name: Checkout
-      uses: actions/checkout@v4
+      # 2. 检出您的存储库代码
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    # 2. 设置 JDK 17，这是现代 Android 构建所必需的
-    - name: Set up Java Development Kit
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'temurin'
-        java-version: '17'
+      # 3. 设置 JDK 17
+      - name: Set up Java Development Kit
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
 
-    # 3. 设置 Python
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: "3.8"
+      # 4. 设置 Python
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.8"
 
-    # 4. 安装构建过程所需的基本系统依赖项
-    - name: Install system dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y git zip unzip wget curl \
-          autoconf automake libtool libltdl-dev pkg-config zlib1g-dev \
-          libncurses5-dev libncursesw5-dev cmake libffi-dev libssl-dev gettext patchelf \
-          build-essential ccache liblzma-dev patch python3-setuptools sudo autopoint
-        
-        # 修复某些 Android SDK 工具所需的 libtinfo5
-        wget http://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/libtinfo5_6.3-2ubuntu0.1_amd64.deb
-        sudo apt install ./libtinfo5_6.3-2ubuntu0.1_amd64.deb
+      # 5. 安装构建过程所需的基本系统依赖项
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git zip unzip wget curl \
+            autoconf automake libtool libltdl-dev pkg-config zlib1g-dev \
+            libncurses5-dev libncursesw5-dev cmake libffi-dev libssl-dev gettext patchelf \
+            build-essential ccache liblzma-dev patch python3-setuptools sudo autopoint
+          
+          # 修复某些 Android SDK 工具所需的 libtinfo5
+          wget http://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/libtinfo5_6.3-2ubuntu0.1_amd64.deb
+          sudo apt install ./libtinfo5_6.3-2ubuntu0.1_amd64.deb
 
-    # 5. 从 requirements.txt 安装 Python 依赖项
-    - name: Install Python dependencies
-      run: |
-        pip install --upgrade pip
-        pip install -r requirements.txt
+      # 6. 从 requirements.txt 安装 Python 依赖项
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
 
-    # 6. 构建 APK
-    # 'script' 命令有助于自动回答许可证协议的 'yes'
-    - name: Build APK (auto accept licenses)
-      run: |
-        script -q -c "yes | buildozer android debug" /dev/null
+      # 7. 构建 APK
+      - name: Build APK (auto accept licenses)
+        run: |
+          script -q -c "yes | buildozer android debug" /dev/null
 
-    # 7. 将生成的 APK 作为构建产物上传
-    - name: Upload APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: meter-replacement-app
-        path: bin/*.apk
+      # 8. 创建 GitHub Release
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ github.event.inputs.version }}
+          release_name: Release v${{ github.event.inputs.version }}
+          body: |
+            自动构建的 APK 发布版本。
+          draft: false
+          prerelease: false
+
+      # 9. 上传 APK 到 Release
+      - name: Upload APK to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./bin/meter-replacement-app-debug.apk # 请确保这是你实际的 APK 文件路径和名称
+          asset_name: meter-replacement-app-v${{ github.event.inputs.version }}.apk
+          asset_content_type: application/vnd.android.package-archive
