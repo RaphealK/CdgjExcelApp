@@ -1,5 +1,4 @@
 import os
-import openpyxl 
 import pandas as pd
 from datetime import datetime
 import traceback
@@ -72,19 +71,21 @@ def show_popup_global(title, message):
     popup.open()
 
 class AssetDatabase:
-    def __init__(self, excel_path):
+    def __init__(self, file_path):
         try:
-            # ==================== MODIFICATION HERE ====================
-            # Explicitly use the 'openpyxl' engine for .xlsx files
-            self.df = pd.read_excel(excel_path, header=2, engine='openpyxl')
-            # =========================================================
+            # [CSV] MODIFIED: Use pd.read_csv to read data. This is much faster and more reliable on Android.
+            # We try both 'utf-8' and 'gbk' encodings as they are common for Chinese files.
+            try:
+                self.df = pd.read_csv(file_path, header=2, on_bad_lines='skip', encoding='utf-8')
+            except UnicodeDecodeError:
+                self.df = pd.read_csv(file_path, header=2, on_bad_lines='skip', encoding='gbk')
         except FileNotFoundError:
             self.df = pd.DataFrame()
             raise
         
         missing_cols = [col for col in REQUIRED_COLUMNS if col not in self.df.columns]
         if missing_cols:
-            raise KeyError(f"Excel文件缺少必要的列: {', '.join(missing_cols)}")
+            raise KeyError(f"CSV文件缺少必要的列: {', '.join(missing_cols)}")
         
         self.df.dropna(subset=['原表资产号'], inplace=True)
         self.df['原表资产号'] = self.df['原表资产号'].astype(str).str.strip()
@@ -110,8 +111,9 @@ class StartupScreen(Screen):
         
         path_layout = BoxLayout(size_hint_y=0.1)
         self.excel_path_input = TextInput(
-            hint_text="点击右侧按钮选择Excel文件",
-            text=os.path.join(os.getcwd(), 'assets', '轮换表计台账.xlsx'),
+            # [CSV] MODIFIED: Hint text and default path updated to reflect CSV usage.
+            hint_text="点击右侧按钮选择CSV文件",
+            text=os.path.join(os.getcwd(), 'assets', '轮换表计台账.csv'),
             readonly=True
         )
         path_layout.add_widget(self.excel_path_input)
@@ -136,7 +138,7 @@ class StartupScreen(Screen):
             foreground_color=(0, 0, 0, 1),
             font_size='12sp'
         )
-        log_scroll.add_widget(self.log_textinput)
+        log_scroll.add_widget(log_scroll)
         log_layout.add_widget(log_scroll)
         self.main_layout.add_widget(log_layout)
         
@@ -184,10 +186,11 @@ class StartupScreen(Screen):
             try:
                 from plyer import filechooser
                 self.add_log("打开桌面文件选择器")
+                # [CSV] MODIFIED: File filter changed to look for .csv files.
                 filechooser.open_file(
                     on_selection=self.handle_selection, 
-                    title="请选择台账Excel文件", 
-                    filters=[("Excel Files", "*.xlsx", "*.xls")]
+                    title="请选择台账CSV文件", 
+                    filters=[("CSV Files", "*.csv")]
                 )
             except ImportError:
                 self.add_log("错误: 需要安装'plyer'库")
@@ -205,7 +208,7 @@ class StartupScreen(Screen):
         try:
             intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
             intent.addCategory(Intent.CATEGORY_OPENABLE)
-            intent.setType("*/*")
+            intent.setType("*/*") # Keep it general to allow selecting various file types
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             intent.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
             current_activity = cast('android.app.Activity', PythonActivity.mActivity)
@@ -260,7 +263,8 @@ class StartupScreen(Screen):
                 cursor.close()
                 self.add_log(f"获取文件名: {file_name}")
             else:
-                file_name = f"台账_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+                # [CSV] MODIFIED: Default filename changed to .csv
+                file_name = f"台账_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
                 self.add_log(f"无法获取文件名，使用默认: {file_name}")
             
             local_path = os.path.join(cache_dir, file_name)
@@ -292,11 +296,11 @@ class StartupScreen(Screen):
             self.show_popup("文件复制错误", f"无法复制文件: {e}")
 
     def start_app(self, instance):
-        excel_path = self.excel_path_input.text.strip()
-        self.add_log(f"尝试加载文件: {excel_path}")
+        csv_path = self.excel_path_input.text.strip()
+        self.add_log(f"尝试加载文件: {csv_path}")
         
-        if not os.path.exists(excel_path):
-            error_msg = f"文件不存在或无法访问: {excel_path}"
+        if not os.path.exists(csv_path):
+            error_msg = f"文件不存在或无法访问: {csv_path}"
             self.add_log(error_msg)
             self.show_popup("错误", error_msg)
             return
@@ -305,7 +309,7 @@ class StartupScreen(Screen):
         try:
             self.add_log("初始化资产数据库...")
             timestamp = datetime.now().strftime("%H:%M:%S")
-            app.asset_db = AssetDatabase(excel_path)
+            app.asset_db = AssetDatabase(csv_path)
             
             row_count = len(app.asset_db.df)
             self.add_log(f"文件加载成功! 时间: {timestamp}")
@@ -317,11 +321,11 @@ class StartupScreen(Screen):
             self.add_log("正在进入主界面...")
             self.manager.current = 'main'
         except KeyError as e:
-            error_msg = f"Excel格式错误: {str(e)}"
+            error_msg = f"CSV格式错误: {str(e)}"
             self.add_log(error_msg)
-            self.show_popup("Excel读取错误", error_msg)
+            self.show_popup("CSV读取错误", error_msg)
         except Exception as e:
-            error_msg = f"加载Excel时发生未知错误: {str(e)}\n{traceback.format_exc()}"
+            error_msg = f"加载CSV时发生未知错误: {str(e)}\n{traceback.format_exc()}"
             self.add_log(error_msg)
             self.show_popup("启动错误", error_msg)
 
@@ -488,7 +492,8 @@ class MainScreen(Screen):
 
         if self.output_path is None or not os.path.dirname(self.output_path) == output_dir:
             now_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-            self.output_path = os.path.join(output_dir, f'录入结果_{now_str}.xlsx')
+            # [CSV] MODIFIED: Output file extension is now .csv
+            self.output_path = os.path.join(output_dir, f'录入结果_{now_str}.csv')
         
         return self.output_path
 
@@ -503,21 +508,34 @@ class MainScreen(Screen):
             '录入时间': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
         
-        self.save_to_excel(data)
+        # [CSV] MODIFIED: Call the new save_to_csv method.
+        self.save_to_csv(data)
 
-    def save_to_excel(self, data):
+    # [CSV] MODIFIED: Replaced save_to_excel with save_to_csv
+    def save_to_csv(self, data):
         output_file = self.get_output_path()
         try:
             new_row = pd.DataFrame([data])
-            df = pd.read_excel(output_file, engine='openpyxl') if os.path.exists(output_file) else pd.DataFrame()
-            df = pd.concat([df, new_row], ignore_index=True)
-          
+            
+            # Check if the file exists to determine if we need to write the header
+            header = not os.path.exists(output_file)
+            
             column_order = [
                 '客户号', '用户名', '原表资产号', '原表表码', '新资产号',
                 '表计类型', '铅封号', '表箱类型', '材料使用', '安装人员',
                 '备注', '录入时间'
             ]
-            df.reindex(columns=column_order).to_excel(output_file, index=False)
+
+            # Append data to the CSV file.
+            # mode='a' is for append.
+            # encoding='utf-8-sig' ensures Chinese characters are displayed correctly in Excel.
+            new_row.reindex(columns=column_order).to_csv(
+                output_file, 
+                mode='a', 
+                index=False, 
+                header=header, 
+                encoding='utf-8-sig'
+            )
 
             self.current_count += 1
             self.show_popup("成功", f"数据已保存！\n路径:\n{output_file}")
@@ -525,7 +543,7 @@ class MainScreen(Screen):
             self.stats_label.text = f'本轮已录入: {self.current_count}条'
 
         except PermissionError:
-            self.show_popup("保存错误", f"无法写入文件！\n请检查权限或关闭已打开的Excel文件:\n{output_file}")
+            self.show_popup("保存错误", f"无法写入文件！\n请检查权限或关闭已打开的CSV文件:\n{output_file}")
         except Exception as e:
             self.show_popup("保存错误", f"保存数据时出错: {str(e)}")
 
@@ -549,4 +567,3 @@ class ExcelDataEntryApp(App):
 
 if __name__ == '__main__':
     ExcelDataEntryApp().run()
-
