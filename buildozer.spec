@@ -97,6 +97,9 @@ android.archs = arm64-v8a, armeabi-v7a
 # 通常保持默认即可，除非有特定需求
 # android.gradle_version = 7.2
 
+
+android.enable_androidx = True
+
 [buildozer]
 # (整数) 日志输出的详细程度
 # 2 表示最详细的日志，有助于调试构建过程中的问题
