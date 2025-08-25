@@ -30,10 +30,9 @@ from kivy.uix.scrollview import ScrollView
 from kivy.clock import Clock
 from kivy.properties import StringProperty
 from kivy.core.window import Window
-from kivy.lang import Builder # <--- 修正: 导入Builder
+from kivy.lang import Builder 
 
 # ==================== 全局字体样式规则 ====================
-# <--- 修正: 添加此代码块以设置全局字体
 Builder.load_string('''
 <Label,Button,TextInput,Spinner>:
     font_name: 'AppFont'
@@ -41,7 +40,6 @@ Builder.load_string('''
 
 # ==================== Android Specific Imports ====================
 if platform == 'android':
-    # ... (此部分代码无变化) ...
     from android import activity, mActivity
     from jnius import autoclass, cast
     from android.permissions import request_permissions, Permission, check_permission
@@ -72,25 +70,21 @@ Window.clearcolor = C["background"]
 class ThemedLabel(Label):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        # self.font_name = 'AppFont' # 已被全局规则取代
         self.color = C["text"]
 
 class ThemedButton(Button):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        # self.font_name = 'AppFont' # 已被全局规则取代
         self.background_color = C["primary"]
         self.background_normal = ''
 
 class ThemedTextInput(TextInput):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        # self.font_name = 'AppFont' # 已被全局规则取代
         self.background_color = (1, 1, 1, 0.8)
         self.foreground_color = C["text"]
 
 class Card(BoxLayout):
-    # ... (代码无变化) ...
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.orientation = 'vertical'; self.padding = '20dp'; self.spacing = '15dp'
@@ -105,7 +99,6 @@ class Card(BoxLayout):
 
 # ==================== Global Helper Functions ====================
 def show_popup_global(title, message):
-    # ... (代码无变化) ...
     content = BoxLayout(orientation='vertical', padding='10dp', spacing='10dp')
     msg_label = ThemedLabel(text=message, size_hint_y=None, halign='left', valign='top', color=C["text_secondary"])
     msg_label.bind(width=lambda *x: msg_label.setter('text_size')(msg_label, (msg_label.width, None)))
@@ -121,7 +114,6 @@ def show_popup_global(title, message):
 
 # ==================== Database Class (Unchanged) ====================
 class AssetDatabase:
-    # ... (代码无变化) ...
     def __init__(self, excel_path):
         try:
             self.df = pd.read_excel(excel_path, header=2, engine='openpyxl')
@@ -139,7 +131,6 @@ class AssetDatabase:
 
 # ==================== UI Screens ====================
 class StartupScreen(Screen):
-    # ... (代码无变化) ...
     ACTIVITY_RESULT_FILE_PICKER = 101
     log_text = StringProperty("文件操作日志:\n")
     def __init__(self, **kwargs):
@@ -244,7 +235,6 @@ class StartupScreen(Screen):
     def show_popup(self, title, message): show_popup_global(title, message)
 
 class MainScreen(Screen):
-    # ... (代码无变化) ...
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.output_path = None; self.current_count = 0; self.state = 'INPUT'; self.user_info = {}
@@ -295,8 +285,14 @@ class MainScreen(Screen):
         form_container = BoxLayout(orientation='vertical', spacing='10dp')
         scroll_view = ScrollView(size_hint=(1, 1))
         card = Card()
-        header_text = (f"正在为 [b]{self.user_info.get('用户名', '')}[/b] 录入新表信息")
-        card.add_widget(ThemedLabel(text=header_text, markup=True, size_hint_y=None, height='40dp'))
+        
+        # <--- 修改开始
+        # 构建包含用户名和原资产号的标题文本，并增加了标签高度以容纳两行
+        header_text = (f"正在为 [b]{self.user_info.get('用户名', '')}[/b] 录入新表信息\n"
+                       f"原资产号: {self.user_info.get('原表资产号', 'N/A')}")
+        card.add_widget(ThemedLabel(text=header_text, markup=True, size_hint_y=None, height='60dp', line_height=1.4))
+        # <--- 修改结束
+        
         form_layout = GridLayout(cols=1, spacing='10dp', size_hint_y=None)
         form_layout.bind(minimum_height=form_layout.setter('height'))
         self.inputs = {}
@@ -311,7 +307,6 @@ class MainScreen(Screen):
             form_layout.add_widget(inp)
         form_layout.add_widget(ThemedLabel(text='表计类型', halign='left', size_hint_y=None, height='20dp'))
         
-        # <--- 修正: 移除 Spinner 上的 font_name，因为它现在由全局规则控制
         self.inputs['meter_type'] = Spinner(
             text='单相表', values=('单相表', '三相表'), size_hint_y=None, height='44dp', 
             background_color=C["accent"]
@@ -397,7 +392,6 @@ class MainScreen(Screen):
     def show_popup(self, title, message): show_popup_global(title, message)
 
 class ExcelDataEntryApp(App):
-    # ... (代码无变化) ...
     def build(self):
         self.screen_manager = ScreenManager(transition=NoTransition())
         self.screen_manager.add_widget(StartupScreen(name='start'))
