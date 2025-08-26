@@ -2,3 +2,5 @@ buildozer
 cython==0.29.33
 openpyxl
 kivymd
+numpy==1.19.5
+pandas==0.25.3
