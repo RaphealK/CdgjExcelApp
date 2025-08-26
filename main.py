@@ -28,9 +28,9 @@ from kivy.uix.screenmanager import ScreenManager, Screen, NoTransition
 from kivy.uix.spinner import Spinner
 from kivy.uix.scrollview import ScrollView
 from kivy.clock import Clock
-from kivy.properties import StringProperty
+from kivy.properties import StringProperty, ObjectProperty
 from kivy.core.window import Window
-from kivy.lang import Builder 
+from kivy.lang import Builder
 
 # ==================== 全局字体样式规则 ====================
 Builder.load_string('''
@@ -57,6 +57,8 @@ if platform == 'android':
 # ==================== Global Constants & Theming ====================
 REQUIRED_COLUMNS = ['客户号', '用户名', '原表资产号', '原表表码']
 INSTALLER_NAMES = '胡军明、胡柏兴、胡海亮、梁群平'
+DATA_COLUMN_ORDER = ['客户号', '用户名', '原表资产号', '原表表码', '新资产号', '表计类型', '铅封号', '表箱类型', '材料使用', '安装人员', '备注', '录入时间']
+
 
 C = {
     "primary": get_color_from_hex("#3F51B5"), "accent": get_color_from_hex("#448AFF"),
@@ -66,7 +68,7 @@ C = {
 }
 Window.clearcolor = C["background"]
 
-# --- Custom Widget Base Classes (现在不再需要单独设置font_name) ---
+# --- Custom Widget Base Classes ---
 class ThemedLabel(Label):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -107,10 +109,47 @@ def show_popup_global(title, message):
     btn = ThemedButton(text='关闭', size_hint_y=None, height='44dp')
     content.add_widget(scroll_view); content.add_widget(btn)
     popup = Popup(
-        title=title, title_color=C["primary"], content=content, size_hint=(0.9, 0.6), 
+        title=title, title_color=C["primary"], content=content, size_hint=(0.9, 0.6),
         separator_color=C["primary"], background='', background_color=C["card"]
     )
     btn.bind(on_press=popup.dismiss); popup.open()
+
+# ==================== DataManager (New Addition) ====================
+class DataManager:
+    """Handles all logic related to reading from and writing to the daily Excel file."""
+    def get_output_path(self):
+        """Generates the file path for today's data file."""
+        if platform == 'android':
+            output_dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).getAbsolutePath()
+        else:
+            output_dir = os.path.expanduser('~/Downloads')
+        
+        # 确保目录存在
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+            
+        today_str = datetime.now().strftime("%Y%m%d")
+        return os.path.join(output_dir, f'录入结果_{today_str}.xlsx')
+
+    def load_daily_data(self):
+        """Loads data from today's file into a DataFrame."""
+        output_file = self.get_output_path()
+        if os.path.exists(output_file):
+            return pd.read_excel(output_file, engine='openpyxl')
+        return pd.DataFrame(columns=DATA_COLUMN_ORDER)
+
+    def save_daily_data(self, df):
+        """Saves the given DataFrame to today's file."""
+        output_file = self.get_output_path()
+        df = df.reindex(columns=DATA_COLUMN_ORDER)
+        df.to_excel(output_file, index=False)
+        
+    def append_data(self, data_dict):
+        """Appends a new row of data to today's file."""
+        df = self.load_daily_data()
+        new_row = pd.DataFrame([data_dict])
+        df = pd.concat([df, new_row], ignore_index=True)
+        self.save_daily_data(df)
 
 # ==================== Database Class (Unchanged) ====================
 class AssetDatabase:
@@ -228,7 +267,9 @@ class StartupScreen(Screen):
         excel_path = self.excel_path_input.text.strip()
         if not os.path.exists(excel_path): self.show_popup("错误", f"文件不存在: {excel_path}"); return
         try:
-            App.get_running_app().asset_db = AssetDatabase(excel_path)
+            app = App.get_running_app()
+            app.asset_db = AssetDatabase(excel_path)
+            app.data_manager = DataManager() # 初始化DataManager
             self.manager.get_screen('main').reset_session()
             self.manager.current = 'main'
         except Exception as e: self.show_popup("启动错误", f"加载Excel时发生错误: {e}\n{traceback.format_exc()}")
@@ -237,27 +278,47 @@ class StartupScreen(Screen):
 class MainScreen(Screen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.output_path = None; self.current_count = 0; self.state = 'INPUT'; self.user_info = {}
+        self.current_count = 0; self.state = 'INPUT'; self.user_info = {}
         self.layout = BoxLayout(orientation='vertical', padding='20dp', spacing='20dp')
         self.add_widget(self.layout)
-    def on_enter(self, *args): self.update_ui_for_state()
+    def on_enter(self, *args):
+        # 每次进入界面时，都重新加载当日数据并更新UI
+        self.reset_session()
+        self.update_ui_for_state()
     def reset_session(self):
-        self.current_count = 0; self.output_path = None; self.state = 'INPUT'
-        if self.manager and self.manager.current == self.name: self.update_ui_for_state()
+        self.state = 'INPUT'
+        self.update_daily_count()
+    def update_daily_count(self):
+        """检查当日文件并更新计数"""
+        try:
+            df = App.get_running_app().data_manager.load_daily_data()
+            self.current_count = len(df)
+            if hasattr(self, 'stats_label'):
+                self.stats_label.text = f'本日已录入: {self.current_count} 条'
+        except Exception:
+            self.current_count = 0
+
     def update_ui_for_state(self):
         self.layout.clear_widgets()
         header = BoxLayout(orientation='vertical', size_hint_y=None, height='60dp')
         title = ThemedLabel(text="数据录入", font_size='24sp', bold=True)
-        self.stats_label = ThemedLabel(text=f'本轮已录入: {self.current_count} 条', font_size='14sp', color=C["text_secondary"])
+        self.stats_label = ThemedLabel(text=f'本日已录入: {self.current_count} 条', font_size='14sp', color=C["text_secondary"])
         header.add_widget(title); header.add_widget(self.stats_label); self.layout.add_widget(header)
+        
         if self.state == 'INPUT': self.build_input_ui()
         elif self.state == 'VERIFY': self.build_verification_ui()
         elif self.state == 'FORM': self.build_form_ui()
+        
         footer_layout = BoxLayout(size_hint_y=None, height='44dp', spacing='10dp')
         back_to_start_btn = ThemedButton(text="返回首页"); back_to_start_btn.bind(on_press=self.back_to_start)
         footer_layout.add_widget(back_to_start_btn)
-        export_btn = ThemedButton(text="导出数据"); export_btn.bind(on_press=self.export_data)
-        footer_layout.add_widget(export_btn); self.layout.add_widget(footer_layout)
+        
+        # 新增“管理数据”按钮
+        edit_data_btn = ThemedButton(text="管理当日数据"); edit_data_btn.bind(on_press=self.go_to_edit_screen)
+        footer_layout.add_widget(edit_data_btn)
+        
+        self.layout.add_widget(footer_layout)
+        
     def build_input_ui(self):
         scroll_view = ScrollView(size_hint=(1, 1)); card = Card()
         card.add_widget(ThemedLabel(text="输入原表资产号后6位进行查询:", size_hint_y=None, height='30dp'))
@@ -286,12 +347,9 @@ class MainScreen(Screen):
         scroll_view = ScrollView(size_hint=(1, 1))
         card = Card()
         
-        # <--- 修改开始
-        # 构建包含用户名和原资产号的标题文本，并增加了标签高度以容纳两行
         header_text = (f"正在为 [b]{self.user_info.get('用户名', '')}[/b] 录入新表信息\n"
                        f"原资产号: {self.user_info.get('原表资产号', 'N/A')}")
         card.add_widget(ThemedLabel(text=header_text, markup=True, size_hint_y=None, height='60dp', line_height=1.4))
-        # <--- 修改结束
         
         form_layout = GridLayout(cols=1, spacing='10dp', size_hint_y=None)
         form_layout.bind(minimum_height=form_layout.setter('height'))
@@ -335,6 +393,9 @@ class MainScreen(Screen):
         self.state = new_state
         self.update_ui_for_state()
 
+    def go_to_edit_screen(self, instance):
+        self.manager.current = 'edit'
+
     def back_to_start(self, instance): self.manager.current = 'start'
     def check_asset(self, instance):
         last_6_digits = self.asset_input.text.strip()
@@ -360,13 +421,7 @@ class MainScreen(Screen):
         self.popup.open()
     def select_duplicate(self, record, instance):
         self.popup.dismiss(); self.user_info = record; self.change_state('VERIFY')
-    def get_output_path(self):
-        if platform == 'android': output_dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).getAbsolutePath()
-        else: output_dir = os.path.expanduser('~/Downloads')
-        if self.output_path is None or not os.path.dirname(self.output_path) == output_dir:
-            now_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-            self.output_path = os.path.join(output_dir, f'录入结果_{now_str}.xlsx')
-        return self.output_path
+        
     def save_data(self, instance):
         data = {'客户号': self.user_info.get('客户号', ''), '用户名': self.user_info.get('用户名', ''),
                 '原表资产号': self.user_info.get('原表资产号', ''), '原表表码': self.inputs['old_meter'].text,
@@ -374,28 +429,195 @@ class MainScreen(Screen):
                 '表计类型': self.inputs['meter_type'].text, '表箱类型': self.inputs['box_type'].text,
                 '安装人员': INSTALLER_NAMES, '材料使用': self.inputs['material_usage'].text, '备注': self.inputs['remark'].text,
                 '录入时间': datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
-        output_file = self.get_output_path()
+        
+        dm = App.get_running_app().data_manager
+        output_file = dm.get_output_path()
+
         try:
-            new_row = pd.DataFrame([data])
-            df = pd.read_excel(output_file, engine='openpyxl') if os.path.exists(output_file) else pd.DataFrame()
-            df = pd.concat([df, new_row], ignore_index=True)
-            column_order = ['客户号', '用户名', '原表资产号', '原表表码', '新资产号', '表计类型', '铅封号', '表箱类型', '材料使用', '安装人员', '备注', '录入时间']
-            df = df.reindex(columns=column_order)
-            df.to_excel(output_file, index=False); self.current_count += 1
+            dm.append_data(data)
+            self.update_daily_count()
             self.show_popup("保存成功", f"数据已成功保存！\n文件路径:\n{output_file}")
             self.change_state('INPUT')
         except PermissionError: self.show_popup("保存错误", f"无法写入文件！\n请检查应用权限或关闭已打开的Excel文件:\n{output_file}")
         except Exception as e: self.show_popup("未知错误", f"保存数据时发生错误: {str(e)}")
-    def export_data(self, instance):
-        if self.output_path and os.path.exists(self.output_path): self.show_popup("导出成功", f"数据已保存到设备“下载”文件夹:\n{self.output_path}")
-        else: self.show_popup("无数据", "尚未录入任何数据，无文件可导出。")
+        
     def show_popup(self, title, message): show_popup_global(title, message)
 
+
+# ==================== EditScreen (New Screen) ====================
+class EditScreen(Screen):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.layout = BoxLayout(orientation='vertical', padding='20dp', spacing='20dp')
+        self.data_grid = None
+        self.add_widget(self.layout)
+
+    def on_enter(self, *args):
+        self.populate_data()
+
+    def populate_data(self):
+        self.layout.clear_widgets()
+
+        header = BoxLayout(orientation='vertical', size_hint_y=None, height='60dp')
+        title = ThemedLabel(text="管理当日数据", font_size='24sp', bold=True)
+        header.add_widget(title)
+        self.layout.add_widget(header)
+
+        scroll_view = ScrollView(size_hint=(1, 1), do_scroll_x=False)
+        self.data_grid = GridLayout(cols=1, spacing='10dp', size_hint_y=None)
+        self.data_grid.bind(minimum_height=self.data_grid.setter('height'))
+
+        try:
+            dm = App.get_running_app().data_manager
+            df = dm.load_daily_data()
+
+            if df.empty:
+                self.data_grid.add_widget(ThemedLabel(text="今天还没有录入任何数据。", size_hint_y=None, height='50dp'))
+            else:
+                for index, row in df.iterrows():
+                    record_card = self.create_record_card(index, row)
+                    self.data_grid.add_widget(record_card)
+        except Exception as e:
+            self.data_grid.add_widget(ThemedLabel(text=f"加载数据失败: {e}", size_hint_y=None, height='50dp'))
+
+        scroll_view.add_widget(self.data_grid)
+        self.layout.add_widget(scroll_view)
+
+        footer_layout = BoxLayout(size_hint_y=None, height='44dp', spacing='10dp')
+        back_btn = ThemedButton(text="返回录入界面"); back_btn.bind(on_press=self.back_to_main)
+        refresh_btn = ThemedButton(text="刷新列表"); refresh_btn.bind(on_press=lambda x: self.populate_data())
+        footer_layout.add_widget(back_btn)
+        footer_layout.add_widget(refresh_btn)
+        self.layout.add_widget(footer_layout)
+
+    def create_record_card(self, index, row):
+        card = Card(padding='15dp')
+        
+        # 数据展示
+        info_text = (f"[b]用户:[/b] {row.get('用户名', '')} ([b]原资产号:[/b] {row.get('原表资产号', '')})\n"
+                     f"[b]新资产号:[/b] {row.get('新资产号', '')} | [b]铅封号:[/b] {row.get('铅封号', '')}")
+        info_label = ThemedLabel(text=info_text, markup=True, size_hint_y=None)
+        info_label.bind(width=lambda *x: info_label.setter('text_size')(info_label, (info_label.width, None)))
+        info_label.bind(texture_size=lambda *x: info_label.setter('height')(info_label, info_label.texture_size[1]))
+        card.add_widget(info_label)
+
+        # 按钮
+        btn_layout = BoxLayout(size_hint_y=None, height='40dp', spacing='10dp')
+        edit_btn = ThemedButton(text="修改")
+        edit_btn.bind(on_press=partial(self.show_edit_popup, index, row))
+        delete_btn = Button(text="删除", background_color=C["error"], background_normal='')
+        delete_btn.bind(on_press=partial(self.confirm_delete, index))
+        btn_layout.add_widget(edit_btn)
+        btn_layout.add_widget(delete_btn)
+        card.add_widget(btn_layout)
+
+        return card
+        
+    def show_edit_popup(self, index, row, instance):
+        content = BoxLayout(orientation='vertical', spacing='10dp', padding='10dp')
+        
+        # 创建一个可滚动的表单
+        form_scroll = ScrollView(size_hint=(1, 1))
+        form_layout = GridLayout(cols=1, spacing='10dp', size_hint_y=None)
+        form_layout.bind(minimum_height=form_layout.setter('height'))
+        
+        inputs = {}
+        # 注意：这里我们使用DATA_COLUMN_ORDER来确保顺序，并排除一些不需要编辑的字段
+        editable_fields = ['原表表码', '新资产号', '铅封号', '材料使用', '备注']
+        spinner_fields = {'表计类型': ('单相表', '三相表'), '表箱类型': ('利旧未换', '单位', '双位', '双位单装')}
+
+        for field in DATA_COLUMN_ORDER:
+            if field in editable_fields:
+                form_layout.add_widget(ThemedLabel(text=field, halign='left', size_hint_y=None, height='20dp'))
+                inp = ThemedTextInput(text=str(row.get(field, '')), multiline=False, size_hint_y=None, height='44dp')
+                inputs[field] = inp
+                form_layout.add_widget(inp)
+            elif field in spinner_fields:
+                form_layout.add_widget(ThemedLabel(text=field, halign='left', size_hint_y=None, height='20dp'))
+                spinner = Spinner(
+                    text=str(row.get(field, spinner_fields[field][0])), 
+                    values=spinner_fields[field], 
+                    size_hint_y=None, height='44dp', 
+                    background_color=C["accent"]
+                )
+                inputs[field] = spinner
+                form_layout.add_widget(spinner)
+        
+        form_scroll.add_widget(form_layout)
+        content.add_widget(form_scroll)
+
+        btn_layout = BoxLayout(size_hint_y=None, height='44dp', spacing='10dp')
+        save_btn = ThemedButton(text='保存修改')
+        cancel_btn = Button(text='取消', background_color=C["text_secondary"], background_normal='')
+        btn_layout.add_widget(save_btn)
+        btn_layout.add_widget(cancel_btn)
+        content.add_widget(btn_layout)
+
+        popup = Popup(title=f"修改 {row.get('用户名', '')} 的数据", content=content, size_hint=(0.9, 0.8),
+                      title_color=C["primary"], separator_color=C["primary"],
+                      background='', background_color=C["card"])
+        
+        save_btn.bind(on_press=lambda x: self.save_edit(index, inputs, popup))
+        cancel_btn.bind(on_press=popup.dismiss)
+        popup.open()
+
+    def save_edit(self, index, inputs, popup):
+        try:
+            dm = App.get_running_app().data_manager
+            df = dm.load_daily_data()
+            
+            for field, widget in inputs.items():
+                df.loc[index, field] = widget.text
+                
+            dm.save_daily_data(df)
+            popup.dismiss()
+            self.populate_data() # 刷新列表
+            show_popup_global("成功", "数据修改已保存。")
+        except Exception as e:
+            show_popup_global("错误", f"保存修改失败: {e}")
+
+    def confirm_delete(self, index, instance):
+        content = BoxLayout(orientation='vertical', padding='10dp', spacing='10dp')
+        content.add_widget(ThemedLabel(text="您确定要删除这条记录吗？\n此操作无法撤销。"))
+        btn_layout = BoxLayout(size_hint_y=None, height='44dp', spacing='10dp')
+        
+        confirm_btn = Button(text='确认删除', background_color=C["error"], background_normal='')
+        cancel_btn = ThemedButton(text='取消')
+        btn_layout.add_widget(confirm_btn)
+        btn_layout.add_widget(cancel_btn)
+        content.add_widget(btn_layout)
+        
+        popup = Popup(title="确认删除", content=content, size_hint=(0.8, 0.4), title_color=C["error"])
+        
+        confirm_btn.bind(on_press=lambda x: self.delete_record(index, popup))
+        cancel_btn.bind(on_press=popup.dismiss)
+        popup.open()
+        
+    def delete_record(self, index, popup):
+        try:
+            dm = App.get_running_app().data_manager
+            df = dm.load_daily_data()
+            df = df.drop(index).reset_index(drop=True)
+            dm.save_daily_data(df)
+            popup.dismiss()
+            self.populate_data() # 刷新列表
+            show_popup_global("成功", "记录已删除。")
+        except Exception as e:
+            show_popup_global("错误", f"删除记录失败: {e}")
+
+
+    def back_to_main(self, instance):
+        self.manager.current = 'main'
+        
 class ExcelDataEntryApp(App):
+    asset_db = ObjectProperty(None)
+    data_manager = ObjectProperty(None)
+    
     def build(self):
         self.screen_manager = ScreenManager(transition=NoTransition())
         self.screen_manager.add_widget(StartupScreen(name='start'))
         self.screen_manager.add_widget(MainScreen(name='main'))
+        self.screen_manager.add_widget(EditScreen(name='edit')) # 添加新屏幕
         return self.screen_manager
 
 if __name__ == '__main__':
