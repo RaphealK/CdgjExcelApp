@@ -114,7 +114,7 @@ def show_popup_global(title, message):
     )
     btn.bind(on_press=popup.dismiss); popup.open()
 
-# ==================== DataManager (New Addition) ====================
+# ==================== DataManager (Updated) ====================
 class DataManager:
     """Handles all logic related to reading from and writing to the daily Excel file."""
     def get_output_path(self):
@@ -124,28 +124,37 @@ class DataManager:
         else:
             output_dir = os.path.expanduser('~/Downloads')
         
-        # 确保目录存在
         if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-            
+            try:
+                os.makedirs(output_dir)
+            except OSError as e:
+                if not os.path.isdir(output_dir):
+                    raise
+                    
         today_str = datetime.now().strftime("%Y%m%d")
         return os.path.join(output_dir, f'录入结果_{today_str}.xlsx')
 
     def load_daily_data(self):
-        """Loads data from today's file into a DataFrame."""
+        """Loads data from today's file into a DataFrame, forcing all columns to be strings."""
         output_file = self.get_output_path()
         if os.path.exists(output_file):
-            return pd.read_excel(output_file, engine='openpyxl')
+            return pd.read_excel(output_file, engine='openpyxl', dtype=str)
         return pd.DataFrame(columns=DATA_COLUMN_ORDER)
 
     def save_daily_data(self, df):
         """Saves the given DataFrame to today's file."""
         output_file = self.get_output_path()
-        df = df.reindex(columns=DATA_COLUMN_ORDER)
-        df.to_excel(output_file, index=False)
+        df_to_save = pd.DataFrame(columns=DATA_COLUMN_ORDER)
+        df_to_save = pd.concat([df_to_save, df], ignore_index=True)
+        df_to_save = df_to_save.reindex(columns=DATA_COLUMN_ORDER)
+        
+        df_to_save.to_excel(output_file, index=False, engine='openpyxl')
         
     def append_data(self, data_dict):
         """Appends a new row of data to today's file."""
+        for key, value in data_dict.items():
+            data_dict[key] = str(value)
+            
         df = self.load_daily_data()
         new_row = pd.DataFrame([data_dict])
         df = pd.concat([df, new_row], ignore_index=True)
@@ -282,14 +291,12 @@ class MainScreen(Screen):
         self.layout = BoxLayout(orientation='vertical', padding='20dp', spacing='20dp')
         self.add_widget(self.layout)
     def on_enter(self, *args):
-        # 每次进入界面时，都重新加载当日数据并更新UI
         self.reset_session()
         self.update_ui_for_state()
     def reset_session(self):
         self.state = 'INPUT'
         self.update_daily_count()
     def update_daily_count(self):
-        """检查当日文件并更新计数"""
         try:
             df = App.get_running_app().data_manager.load_daily_data()
             self.current_count = len(df)
@@ -313,7 +320,6 @@ class MainScreen(Screen):
         back_to_start_btn = ThemedButton(text="返回首页"); back_to_start_btn.bind(on_press=self.back_to_start)
         footer_layout.add_widget(back_to_start_btn)
         
-        # 新增“管理数据”按钮
         edit_data_btn = ThemedButton(text="管理当日数据"); edit_data_btn.bind(on_press=self.go_to_edit_screen)
         footer_layout.add_widget(edit_data_btn)
         
@@ -439,7 +445,7 @@ class MainScreen(Screen):
             self.show_popup("保存成功", f"数据已成功保存！\n文件路径:\n{output_file}")
             self.change_state('INPUT')
         except PermissionError: self.show_popup("保存错误", f"无法写入文件！\n请检查应用权限或关闭已打开的Excel文件:\n{output_file}")
-        except Exception as e: self.show_popup("未知错误", f"保存数据时发生错误: {str(e)}")
+        except Exception as e: self.show_popup("未知错误", f"保存数据时发生错误: {str(e)}\n{traceback.format_exc()}")
         
     def show_popup(self, title, message): show_popup_global(title, message)
 
@@ -493,7 +499,6 @@ class EditScreen(Screen):
     def create_record_card(self, index, row):
         card = Card(padding='15dp')
         
-        # 数据展示
         info_text = (f"[b]用户:[/b] {row.get('用户名', '')} ([b]原资产号:[/b] {row.get('原表资产号', '')})\n"
                      f"[b]新资产号:[/b] {row.get('新资产号', '')} | [b]铅封号:[/b] {row.get('铅封号', '')}")
         info_label = ThemedLabel(text=info_text, markup=True, size_hint_y=None)
@@ -501,7 +506,6 @@ class EditScreen(Screen):
         info_label.bind(texture_size=lambda *x: info_label.setter('height')(info_label, info_label.texture_size[1]))
         card.add_widget(info_label)
 
-        # 按钮
         btn_layout = BoxLayout(size_hint_y=None, height='40dp', spacing='10dp')
         edit_btn = ThemedButton(text="修改")
         edit_btn.bind(on_press=partial(self.show_edit_popup, index, row))
@@ -516,13 +520,11 @@ class EditScreen(Screen):
     def show_edit_popup(self, index, row, instance):
         content = BoxLayout(orientation='vertical', spacing='10dp', padding='10dp')
         
-        # 创建一个可滚动的表单
         form_scroll = ScrollView(size_hint=(1, 1))
         form_layout = GridLayout(cols=1, spacing='10dp', size_hint_y=None)
         form_layout.bind(minimum_height=form_layout.setter('height'))
         
         inputs = {}
-        # 注意：这里我们使用DATA_COLUMN_ORDER来确保顺序，并排除一些不需要编辑的字段
         editable_fields = ['原表表码', '新资产号', '铅封号', '材料使用', '备注']
         spinner_fields = {'表计类型': ('单相表', '三相表'), '表箱类型': ('利旧未换', '单位', '双位', '双位单装')}
 
@@ -571,7 +573,7 @@ class EditScreen(Screen):
                 
             dm.save_daily_data(df)
             popup.dismiss()
-            self.populate_data() # 刷新列表
+            self.populate_data()
             show_popup_global("成功", "数据修改已保存。")
         except Exception as e:
             show_popup_global("错误", f"保存修改失败: {e}")
@@ -600,7 +602,7 @@ class EditScreen(Screen):
             df = df.drop(index).reset_index(drop=True)
             dm.save_daily_data(df)
             popup.dismiss()
-            self.populate_data() # 刷新列表
+            self.populate_data()
             show_popup_global("成功", "记录已删除。")
         except Exception as e:
             show_popup_global("错误", f"删除记录失败: {e}")
@@ -617,7 +619,7 @@ class ExcelDataEntryApp(App):
         self.screen_manager = ScreenManager(transition=NoTransition())
         self.screen_manager.add_widget(StartupScreen(name='start'))
         self.screen_manager.add_widget(MainScreen(name='main'))
-        self.screen_manager.add_widget(EditScreen(name='edit')) # 添加新屏幕
+        self.screen_manager.add_widget(EditScreen(name='edit'))
         return self.screen_manager
 
 if __name__ == '__main__':
