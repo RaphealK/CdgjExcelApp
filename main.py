@@ -114,7 +114,7 @@ def show_popup_global(title, message):
     )
     btn.bind(on_press=popup.dismiss); popup.open()
 
-# ==================== DataManager (Updated) ====================
+# ==================== DataManager (Updated with Code-Level Fix) ====================
 class DataManager:
     """Handles all logic related to reading from and writing to the daily Excel file."""
     def get_output_path(self):
@@ -135,10 +135,29 @@ class DataManager:
         return os.path.join(output_dir, f'录入结果_{today_str}.xlsx')
 
     def load_daily_data(self):
-        """Loads data from today's file into a DataFrame, forcing all columns to be strings."""
+        """
+        Loads data from today's file. It first reads the Excel file and then
+        converts all columns to strings to avoid potential dtype issues on Android.
+        """
         output_file = self.get_output_path()
         if os.path.exists(output_file):
-            return pd.read_excel(output_file, engine='openpyxl', dtype=str)
+            try:
+                # Step 1: Read the Excel file without the problematic 'dtype' parameter.
+                df = pd.read_excel(output_file, engine='openpyxl')
+
+                # Step 2: After loading, first fill any NaN (empty) cells with an 
+                # empty string, and then convert the entire DataFrame to string type.
+                # This is a much more stable, two-step process.
+                df = df.fillna('').astype(str)
+                
+                return df
+
+            except Exception as e:
+                # If reading fails, show an error and return a safe, empty DataFrame.
+                show_popup_global("加载错误", f"读取当日数据文件时出错:\n{e}")
+                return pd.DataFrame(columns=DATA_COLUMN_ORDER)
+
+        # If the file doesn't exist, return a new empty DataFrame as before.
         return pd.DataFrame(columns=DATA_COLUMN_ORDER)
 
     def save_daily_data(self, df):
