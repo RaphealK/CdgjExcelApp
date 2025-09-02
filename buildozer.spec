@@ -29,7 +29,7 @@ version = 1.0.0
 # (列表) 应用所需的Python依赖库
 # buildozer会自动通过pip下载这些库。我们添加了pandas, openpyxl和plyer
 # kivymd, kivy, jnius 通常会被buildozer自动包含，但明确写出更保险
-requirements = python3,kivy,pandas,plyer,openpyxl,cython,pyjnius,jnius,et_xmlfile
+requirements = python3,plyer,cython,pyjnius,jnius,et_xmlfile,kivy==2.2.1,pandas==1.5.3,numpy==1.23.4,openpyxl==3.1.2
 
 # (字符串) 应用启动时加载的屏幕方向
 # 可选项: landscape, portrait, all
