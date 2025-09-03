@@ -109,4 +109,4 @@ log_level = 2
 warn_on_root = 1
 
 # 指定本地配方目录的路径
-p4a.local_recipes = ./my_recipes
+p4a.local_recipes = ./my_recipes/
