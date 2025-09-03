@@ -107,3 +107,6 @@ log_level = 2
 # (布尔值) 是否允许buildozer访问网络来下载依赖项
 # 通常应保持为 True
 warn_on_root = 1
+
+# 指定本地配方目录的路径
+p4a.local_recipes = ./my_recipes
